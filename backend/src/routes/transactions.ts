@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { query, transaction } from '../db';
+import { query } from '../db';
 import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
@@ -8,7 +8,7 @@ const router = Router();
 router.use(authenticate);
 
 // Create transaction
-router.post('/', authorize('admin', 'manager', 'operator'), async (req: any, res, next) => {
+router.post('/', authorize('admin', 'manager', 'operator'), async (req: any, res, next): Promise<any> => {
   try {
     const {
       locationId,
@@ -103,20 +103,30 @@ router.get('/', async (req: any, res, next) => {
       queryText += ` AND source_type = $${paramCount++}`;
     }
 
-    // Apply user location filter if not admin
-    if (req.user.role !== 'admin' && req.user.locationId) {
-      params.push(req.user.locationId);
-      queryText += ` AND location_name = (SELECT name FROM location WHERE id = $${paramCount++})`;
-    }
+    queryText += ' ORDER BY transaction_date DESC, created_at DESC';
 
-    params.push(limit, offset);
-    queryText += ` ORDER BY transaction_date DESC LIMIT $${paramCount++} OFFSET $${paramCount++}`;
+    params.push(limit);
+    queryText += ` LIMIT $${paramCount++}`;
+
+    params.push(offset);
+    queryText += ` OFFSET $${paramCount++}`;
 
     const result = await query(queryText, params);
 
+    // Get total count
+    let countQuery = 'SELECT COUNT(*) FROM v_transaction_details WHERE 1=1';
+    const countParams = params.slice(0, -2); // Remove limit and offset
+
+    if (locationId) countQuery += ' AND location_name = (SELECT name FROM location WHERE id = $1)';
+    if (startDate) countQuery += ` AND transaction_date >= $${locationId ? 2 : 1}`;
+    if (endDate) countQuery += ` AND transaction_date <= $${locationId && startDate ? 3 : locationId || startDate ? 2 : 1}`;
+    if (sourceType) countQuery += ` AND source_type = $${countParams.length + 1}`;
+
+    const countResult = await query(countQuery, countParams);
+
     res.json({
       transactions: result.rows,
-      total: result.rowCount,
+      total: parseInt(countResult.rows[0].count),
       limit: parseInt(limit),
       offset: parseInt(offset),
     });
@@ -125,11 +135,11 @@ router.get('/', async (req: any, res, next) => {
   }
 });
 
-// Get transaction by ID
-router.get('/:id', async (req, res, next) => {
+// Get single transaction
+router.get('/:id', async (req, res, next): Promise<any> => {
   try {
     const result = await query(
-      'SELECT * FROM v_transaction_details WHERE id = $1',
+      'SELECT * FROM v_transaction_details WHERE transaction_id = $1',
       [req.params.id]
     );
 
@@ -144,17 +154,16 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // Update payment status
-router.patch('/:id/payment', authorize('admin', 'manager'), async (req: any, res, next) => {
+router.patch('/:id/payment', authorize('admin', 'manager'), async (req, res, next) => {
   try {
-    const { paymentStatus, paidAmount, paymentMethod, paymentReference } = req.body;
+    const { paymentStatus, paymentDate, paymentReference } = req.body;
 
     const result = await query(
       `UPDATE transaction 
-       SET payment_status = $1, paid_amount = $2, payment_method = $3, 
-           payment_reference = $4, paid_at = CURRENT_TIMESTAMP
-       WHERE id = $5
+       SET payment_status = $1, payment_date = $2, payment_reference = $3, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4
        RETURNING *`,
-      [paymentStatus, paidAmount, paymentMethod, paymentReference, req.params.id]
+      [paymentStatus, paymentDate, paymentReference, req.params.id]
     );
 
     if (result.rows.length === 0) {
