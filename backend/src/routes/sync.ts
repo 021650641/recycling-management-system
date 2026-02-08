@@ -6,7 +6,7 @@ const router = Router();
 router.use(authenticate);
 
 // Sync offline transactions
-router.post('/transactions', async (req: any, res, next) => {
+router.post('/transactions', async (req: any, res, next): Promise<any> => {
   try {
     const { transactions, deviceId } = req.body;
 
@@ -72,7 +72,7 @@ router.post('/transactions', async (req: any, res, next) => {
 });
 
 // Get pending sync items
-router.get('/pending', async (req, res, next) => {
+router.get('/pending', async (req, res, next): Promise<any> => {
   try {
     const { deviceId } = req.query;
 
