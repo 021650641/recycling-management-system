@@ -30,7 +30,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
-app.get('/health', async (req: Request, res: Response) => {
+app.get('/health', async (_req: Request, res: Response) => {
   const dbHealthy = await healthCheck();
   
   res.status(dbHealthy ? 200 : 503).json({
@@ -67,7 +67,7 @@ app.use((req: Request, res: Response) => {
 });
 
 // Error handler
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Error:', err);
   
   const statusCode = err.statusCode || err.status || 500;
@@ -85,21 +85,18 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 // Start server
 const server = app.listen(config.port, () => {
   console.log(`🚀 Server running on port ${config.port}`);
-  console.log(`📚 API available at http://localhost:${config.port}${config.apiPrefix}`);
-  console.log(`🏥 Health check at http://localhost:${config.port}/health`);
+  console.log(`📝 API available at http://localhost:${config.port}${config.apiPrefix}`);
   console.log(`🌍 Environment: ${config.nodeEnv}`);
 });
 
 // Graceful shutdown
 const gracefulShutdown = (signal: string) => {
-  console.log(`\n${signal} received, closing server gracefully...`);
-  
+  console.log(`\n${signal} received, shutting down gracefully...`);
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
   });
-  
-  // Force close after 10 seconds
+
   setTimeout(() => {
     console.error('Forcing shutdown after timeout');
     process.exit(1);
