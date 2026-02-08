@@ -25,7 +25,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', async (req, res, next): Promise<any> => {
   try {
     const result = await query('SELECT * FROM waste_picker WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) {
