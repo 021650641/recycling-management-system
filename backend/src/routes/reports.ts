@@ -22,7 +22,7 @@ router.get('/trends', async (req: any, res, next) => {
 });
 
 // Get apartment summary
-router.get('/apartment-summary', async (req, res, next) => {
+router.get('/apartment-summary', async (req, res, next): Promise<any> => {
   try {
     const { apartmentId, materialName, startDate, endDate } = req.query;
 
@@ -109,22 +109,14 @@ router.get('/pending-payments', authorize('admin', 'manager'), async (req, res, 
 
     if (locationId) {
       params.push(locationId);
-      queryText += ' AND location_name = (SELECT name FROM location WHERE id = $1)';
+      queryText += ' AND location_id = $1';
     }
+
+    queryText += ' ORDER BY transaction_date, waste_picker_name';
 
     const result = await query(queryText, params);
 
-    res.json({ pendingPayments: result.rows });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Refresh materialized views
-router.post('/refresh-views', authorize('admin'), async (req, res, next) => {
-  try {
-    await query('SELECT refresh_reporting_views()');
-    res.json({ message: 'Views refreshed successfully' });
+    res.json({ payments: result.rows });
   } catch (error) {
     next(error);
   }
