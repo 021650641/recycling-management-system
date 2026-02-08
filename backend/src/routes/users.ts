@@ -6,7 +6,7 @@ import bcrypt from 'bcrypt';
 const router = Router();
 router.use(authenticate);
 
-router.get('/', authorize('admin', 'manager'), async (req, res, next) => {
+router.get('/', authorize('admin', 'manager'), async (_req, res, next) => {
   try {
     const result = await query('SELECT id, email, first_name, last_name, role, location_id, is_active FROM "user" ORDER BY first_name, last_name');
     res.json({ users: result.rows });
