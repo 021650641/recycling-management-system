@@ -115,7 +115,7 @@ CREATE TABLE client (
 -- Transactions table (main receipts) - partitioned by date
 CREATE TABLE transaction (
     id UUID DEFAULT uuid_generate_v4(),
-    transaction_number VARCHAR(50) UNIQUE NOT NULL,
+    transaction_number VARCHAR(50) NOT NULL,
     location_id UUID NOT NULL REFERENCES location(id),
     material_category_id UUID NOT NULL REFERENCES material_category(id),
 
