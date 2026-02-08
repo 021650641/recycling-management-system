@@ -8,7 +8,7 @@ import { authenticate } from '../middleware/auth';
 const router = Router();
 
 // Login
-router.post('/login', async (req, res, next) => {
+router.post('/login', async (req, res, next): Promise<any> => {
   try {
     const { email, password } = req.body;
 
@@ -68,7 +68,7 @@ router.post('/login', async (req, res, next) => {
 });
 
 // Get current user
-router.get('/me', authenticate, async (req: any, res, next) => {
+router.get('/me', authenticate, async (req: any, res, next): Promise<any> => {
   try {
     const result = await query(
       'SELECT id, email, first_name, last_name, role, location_id, is_active FROM "user" WHERE id = $1',
