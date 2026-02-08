@@ -1,0 +1,54 @@
+import { Router } from 'express';
+import { query } from '../db';
+import { authenticate, authorize } from '../middleware/auth';
+
+const router = Router();
+router.use(authenticate);
+
+router.get('/', async (req, res, next) => {
+  try {
+    const { search } = req.query;
+    let queryText = 'SELECT * FROM waste_picker WHERE is_active = true';
+    const params: any[] = [];
+
+    if (search) {
+      params.push(`%${search}%`);
+      queryText += ' AND (first_name ILIKE $1 OR last_name ILIKE $1 OR id_number ILIKE $1)';
+    }
+
+    queryText += ' ORDER BY first_name, last_name';
+
+    const result = await query(queryText, params);
+    res.json({ wastePickers: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id', async (req, res, next) => {
+  try {
+    const result = await query('SELECT * FROM waste_picker WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Waste picker not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/', authorize('admin', 'manager'), async (req, res, next) => {
+  try {
+    const { firstName, lastName, idNumber, phone, email, address, isAffiliated, bankName, bankAccount, paymentMethod } = req.body;
+    const result = await query(
+      `INSERT INTO waste_picker (first_name, last_name, id_number, phone, email, address, is_affiliated, bank_name, bank_account, payment_method)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      [firstName, lastName, idNumber, phone, email, address, isAffiliated, bankName, bankAccount, paymentMethod]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+export default router;
