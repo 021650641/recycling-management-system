@@ -1,9 +1,9 @@
 #!/bin/bash
 
-#######################################
+############################################
 # Recycling Management System Deployment Script
 # Automated VPS deployment for Ubuntu/Debian
-#######################################
+############################################
 
 set -e  # Exit on any error
 
@@ -43,9 +43,9 @@ if ! sudo -n true 2>/dev/null; then
     exit 1
 fi
 
-log_info "========================================"
+log_info "==========================================="
 log_info "Recycling Management System Deployment"
-log_info "========================================"
+log_info "==========================================="
 echo ""
 
 # Interactive prompts
@@ -78,6 +78,39 @@ INSTALL_SSL=${INSTALL_SSL:-y}
 
 read -p "Enter email for SSL certificate (required for Let's Encrypt): " SSL_EMAIL
 
+# Detect if this is an upgrade
+IS_UPGRADE=false
+if [ -d "$INSTALL_DIR" ]; then
+    log_warning "Installation directory already exists at $INSTALL_DIR"
+    
+    # Check if it looks like our application
+    if [ -d "$INSTALL_DIR/backend" ] && [ -d "$INSTALL_DIR/frontend" ]; then
+        log_info "Detected existing Recycling Management System installation"
+        read -p "Upgrade existing installation? (y/n) [y]: " UPGRADE_CONFIRM
+        UPGRADE_CONFIRM=${UPGRADE_CONFIRM:-y}
+        
+        if [[ $UPGRADE_CONFIRM =~ ^[Yy]$ ]]; then
+            IS_UPGRADE=true
+            log_info "Upgrade mode enabled. Existing configuration will be preserved."
+        else
+            log_error "Upgrade declined. Exiting."
+            exit 1
+        fi
+    else
+        log_error "Directory exists but doesn't appear to be our application."
+        read -p "Remove directory and proceed with fresh install? (y/n): " REMOVE_CONFIRM
+        if [[ $REMOVE_CONFIRM =~ ^[Yy]$ ]]; then
+            log_warning "Backing up existing directory..."
+            BACKUP_DIR="${INSTALL_DIR}_old_$(date +%Y%m%d_%H%M%S)"
+            sudo mv "$INSTALL_DIR" "$BACKUP_DIR"
+            log_success "Old directory moved to $BACKUP_DIR"
+        else
+            log_error "Cannot proceed. Please remove the directory manually or choose a different path."
+            exit 1
+        fi
+    fi
+fi
+
 echo ""
 log_info "Configuration Summary:"
 echo "  Domain: $DOMAIN_NAME"
@@ -86,6 +119,7 @@ echo "  Database: $DB_NAME"
 echo "  Database User: $DB_USER"
 echo "  API Port: $API_PORT"
 echo "  SSL: $INSTALL_SSL"
+echo "  Mode: $([ "$IS_UPGRADE" = true ] && echo "UPGRADE" || echo "NEW INSTALL")"
 echo ""
 read -p "Proceed with installation? (y/n): " CONFIRM
 
@@ -94,16 +128,16 @@ if [[ ! $CONFIRM =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-#######################################
+############################################
 # 1. System Update & Dependencies
-#######################################
+############################################
 log_info "Step 1: Updating system and installing dependencies..."
 
 sudo apt update
 sudo apt upgrade -y
 
-log_info "Installing Node.js 18.x..."
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+log_info "Installing Node.js 20.x (LTS)..."
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 
 log_info "Installing PostgreSQL..."
@@ -113,126 +147,191 @@ log_info "Installing Nginx..."
 sudo apt install -y nginx
 
 log_info "Installing additional tools..."
-sudo apt install -y git curl wget ufw certbot python3-certbot-nginx
-
-log_info "Installing PM2 globally..."
-sudo npm install -g pm2
+sudo apt install -y git curl build-essential certbot python3-certbot-nginx
 
 log_success "Dependencies installed successfully!"
 
-#######################################
+############################################
 # 2. PostgreSQL Setup
-#######################################
-log_info "Step 2: Setting up PostgreSQL database..."
+############################################
+if [ "$IS_UPGRADE" = false ]; then
+    log_info "Step 2: Setting up PostgreSQL database..."
+    
+    sudo -u postgres psql <<EOF
+-- Create user if not exists
+DO \$\$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_user WHERE usename = '$DB_USER') THEN
+        CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';
+    END IF;
+END
+\$\$;
 
-sudo -u postgres psql <<EOF
-CREATE DATABASE $DB_NAME;
-CREATE USER $DB_USER WITH ENCRYPTED PASSWORD '$DB_PASSWORD';
+-- Create database if not exists
+SELECT 'CREATE DATABASE $DB_NAME OWNER $DB_USER'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$DB_NAME')\gexec
+
+-- Grant privileges
 GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;
-ALTER DATABASE $DB_NAME OWNER TO $DB_USER;
-\c $DB_NAME
-GRANT ALL ON SCHEMA public TO $DB_USER;
 EOF
 
-log_success "PostgreSQL database created!"
+    log_success "PostgreSQL database configured!"
+else
+    log_info "Step 2: Skipping database setup (upgrade mode)..."
+fi
 
-#######################################
-# 3. Clone Repository
-#######################################
-log_info "Step 3: Cloning application repository..."
+############################################
+# 3. Application Setup
+############################################
+log_info "Step 3: Setting up application..."
 
-sudo mkdir -p $(dirname $INSTALL_DIR)
-sudo git clone https://github.com/021650641/recycling-management-system.git $INSTALL_DIR
+if [ "$IS_UPGRADE" = true ]; then
+    log_info "Backing up existing installation..."
+    BACKUP_DIR="${INSTALL_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
+    sudo cp -r "$INSTALL_DIR" "$BACKUP_DIR"
+    log_success "Backup created at $BACKUP_DIR"
+    
+    # Preserve .env file
+    if [ -f "$INSTALL_DIR/backend/.env" ]; then
+        log_info "Preserving existing .env configuration..."
+        sudo cp "$INSTALL_DIR/backend/.env" "/tmp/.env.backup"
+    fi
+fi
+
+# Create installation directory
+sudo mkdir -p $INSTALL_DIR
 sudo chown -R $USER:$USER $INSTALL_DIR
 
-log_success "Repository cloned!"
+# Clone repository
+log_info "Cloning repository..."
+if [ "$IS_UPGRADE" = true ]; then
+    cd $INSTALL_DIR
+    git fetch origin
+    git reset --hard origin/main
+    git pull origin main
+else
+    git clone https://github.com/021650641/recycling-management-system.git $INSTALL_DIR
+    cd $INSTALL_DIR
+fi
 
-#######################################
+############################################
 # 4. Backend Setup
-#######################################
+############################################
 log_info "Step 4: Setting up backend..."
 
 cd $INSTALL_DIR/backend
 
-log_info "Installing backend dependencies..."
-npm install
-
-log_info "Creating backend .env file..."
-cat > .env <<EOF
+# Restore .env if upgrading, otherwise create new
+if [ "$IS_UPGRADE" = true ] && [ -f "/tmp/.env.backup" ]; then
+    log_info "Restoring previous .env configuration..."
+    sudo cp "/tmp/.env.backup" .env
+    sudo rm "/tmp/.env.backup"
+else
+    log_info "Creating backend .env file..."
+    cat > .env <<EOF
+# Server Configuration
 NODE_ENV=production
 PORT=$API_PORT
-DATABASE_URL=postgresql://$DB_USER:$DB_PASSWORD@localhost:5432/$DB_NAME
-JWT_SECRET=$JWT_SECRET
-CORS_ORIGIN=https://$DOMAIN_NAME
-LOG_LEVEL=info
-EOF
 
-log_info "Running database migrations..."
-if [ -f "migrations/run-migrations.sh" ]; then
-    chmod +x migrations/run-migrations.sh
-    ./migrations/run-migrations.sh
-else
-    npm run migrate 2>/dev/null || log_warning "No migration script found, skipping..."
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=$DB_NAME
+DB_USER=$DB_USER
+DB_PASSWORD=$DB_PASSWORD
+
+# JWT Configuration
+JWT_SECRET=$JWT_SECRET
+JWT_EXPIRES_IN=7d
+
+# Frontend URL
+FRONTEND_URL=https://$DOMAIN_NAME
+
+# Email Configuration (configure later)
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM=
+
+# File Upload
+MAX_FILE_SIZE=10485760
+UPLOAD_DIR=./uploads
+EOF
 fi
 
-log_info "Building backend..."
-npm run build
+log_info "Installing backend dependencies..."
+npm install --production
 
-log_info "Setting up PM2 for backend..."
-pm2 delete recycling-api 2>/dev/null || true
-pm2 start dist/server.js --name recycling-api --time
-pm2 save
-sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u $USER --hp /home/$USER
+log_info "Running database migrations..."
+npm run migrate
 
-log_success "Backend setup complete!"
+log_success "Backend configured successfully!"
 
-#######################################
+############################################
 # 5. Frontend Setup
-#######################################
+############################################
 log_info "Step 5: Setting up frontend..."
 
 cd $INSTALL_DIR/frontend
 
-log_info "Installing frontend dependencies..."
-npm install
-
+# Create or update .env
 log_info "Creating frontend .env file..."
 cat > .env <<EOF
 VITE_API_URL=https://$DOMAIN_NAME/api
-VITE_ENV=production
+VITE_APP_NAME=Recycling Management System
 EOF
+
+log_info "Installing frontend dependencies..."
+npm install
 
 log_info "Building frontend..."
 npm run build
 
 log_success "Frontend built successfully!"
 
-#######################################
-# 6. Nginx Configuration
-#######################################
-log_info "Step 6: Configuring Nginx..."
+############################################
+# 6. PM2 Process Manager
+############################################
+log_info "Step 6: Setting up PM2 process manager..."
 
-sudo tee /etc/nginx/sites-available/recycling-app > /dev/null <<EOF
+# Install PM2 globally if not already installed
+if ! command -v pm2 &> /dev/null; then
+    sudo npm install -g pm2
+fi
+
+# Stop existing process if upgrading
+if [ "$IS_UPGRADE" = true ]; then
+    log_info "Stopping existing application..."
+    pm2 stop recycling-backend || true
+    pm2 delete recycling-backend || true
+fi
+
+# Start backend with PM2
+cd $INSTALL_DIR/backend
+pm2 start npm --name "recycling-backend" -- start
+pm2 save
+pm2 startup systemd -u $USER --hp $HOME
+
+log_success "PM2 configured successfully!"
+
+############################################
+# 7. Nginx Configuration
+############################################
+log_info "Step 7: Configuring Nginx..."
+
+sudo tee /etc/nginx/sites-available/$DOMAIN_NAME <<EOF
 server {
     listen 80;
     server_name $DOMAIN_NAME;
 
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-
     # Frontend
-    root $INSTALL_DIR/frontend/dist;
-    index index.html;
+    location / {
+        root $INSTALL_DIR/frontend/dist;
+        try_files \$uri \$uri/ /index.html;
+    }
 
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 1024;
-    gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml+rss application/json;
-
-    # API proxy
+    # Backend API
     location /api {
         proxy_pass http://localhost:$API_PORT;
         proxy_http_version 1.1;
@@ -243,260 +342,111 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        
-        # Timeouts
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
     }
 
-    # Static files caching
-    location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
 
-    # SPA fallback
-    location / {
-        try_files \$uri \$uri/ /index.html;
-    }
+    # File upload size
+    client_max_body_size 10M;
 }
 EOF
 
 # Enable site
-sudo ln -sf /etc/nginx/sites-available/recycling-app /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
+sudo ln -sf /etc/nginx/sites-available/$DOMAIN_NAME /etc/nginx/sites-enabled/
 
-# Test and reload Nginx
+# Remove default site if this is a new install
+if [ "$IS_UPGRADE" = false ]; then
+    sudo rm -f /etc/nginx/sites-enabled/default
+fi
+
+# Test nginx configuration
 sudo nginx -t
-sudo systemctl restart nginx
 
-log_success "Nginx configured!"
+# Reload nginx
+sudo systemctl reload nginx
 
-#######################################
-# 7. Firewall Configuration
-#######################################
-log_info "Step 7: Configuring firewall..."
+log_success "Nginx configured successfully!"
 
-sudo ufw --force enable
-sudo ufw allow 22/tcp comment 'SSH'
-sudo ufw allow 80/tcp comment 'HTTP'
-sudo ufw allow 443/tcp comment 'HTTPS'
-
-log_success "Firewall configured!"
-
-#######################################
-# 8. SSL Certificate
-#######################################
+############################################
+# 8. SSL Certificate (Optional)
+############################################
 if [[ $INSTALL_SSL =~ ^[Yy]$ ]]; then
     log_info "Step 8: Installing SSL certificate..."
     
-    if [ -z "$SSL_EMAIL" ]; then
-        log_warning "No email provided. Skipping SSL installation."
-    else
-        sudo certbot --nginx -d $DOMAIN_NAME --non-interactive --agree-tos --email $SSL_EMAIL --redirect
-        log_success "SSL certificate installed!"
-        
-        # Setup auto-renewal
-        sudo systemctl enable certbot.timer
-        sudo systemctl start certbot.timer
-        log_success "SSL auto-renewal configured!"
-    fi
+    sudo certbot --nginx -d $DOMAIN_NAME --non-interactive --agree-tos --email $SSL_EMAIL --redirect
+    
+    # Set up auto-renewal
+    sudo systemctl enable certbot.timer
+    sudo systemctl start certbot.timer
+    
+    log_success "SSL certificate installed and auto-renewal configured!"
 else
-    log_warning "Skipping SSL installation. You can install it later with: sudo certbot --nginx -d $DOMAIN_NAME"
+    log_info "Step 8: Skipping SSL installation."
 fi
 
-#######################################
-# 9. Create Management Scripts
-#######################################
-log_info "Step 9: Creating management scripts..."
+############################################
+# 9. Firewall Configuration
+############################################
+log_info "Step 9: Configuring firewall..."
 
-# Create update script
-cat > $INSTALL_DIR/update.sh <<'EOFSCRIPT'
-#!/bin/bash
-set -e
-
-INSTALL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
-echo "Updating Recycling Management System..."
-
-cd $INSTALL_DIR
-git pull
-
-echo "Updating backend..."
-cd backend
-npm install
-npm run build
-pm2 restart recycling-api
-
-echo "Updating frontend..."
-cd ../frontend
-npm install
-npm run build
-
-echo "Reloading Nginx..."
-sudo systemctl reload nginx
-
-echo "Update complete!"
-pm2 logs recycling-api --lines 20
-EOFSCRIPT
-
-chmod +x $INSTALL_DIR/update.sh
-
-# Create backup script
-cat > $INSTALL_DIR/backup.sh <<EOFSCRIPT
-#!/bin/bash
-set -e
-
-BACKUP_DIR="\$HOME/backups/recycling"
-DATE=\$(date +%Y%m%d_%H%M%S)
-
-mkdir -p \$BACKUP_DIR
-
-echo "Creating backup..."
-
-# Database backup
-sudo -u postgres pg_dump $DB_NAME | gzip > \$BACKUP_DIR/db_\$DATE.sql.gz
-
-# Application backup
-tar -czf \$BACKUP_DIR/app_\$DATE.tar.gz -C $INSTALL_DIR .
-
-# Keep only last 7 backups
-ls -t \$BACKUP_DIR/db_*.sql.gz | tail -n +8 | xargs -r rm
-ls -t \$BACKUP_DIR/app_*.tar.gz | tail -n +8 | xargs -r rm
-
-echo "Backup completed: \$BACKUP_DIR"
-ls -lh \$BACKUP_DIR | tail -5
-EOFSCRIPT
-
-chmod +x $INSTALL_DIR/backup.sh
-
-# Create status script
-cat > $INSTALL_DIR/status.sh <<EOFSCRIPT
-#!/bin/bash
-
-echo "===== Recycling Management System Status ====="
-echo ""
-echo "Backend API:"
-pm2 status recycling-api
-echo ""
-echo "Recent Logs:"
-pm2 logs recycling-api --lines 10 --nostream
-echo ""
-echo "Nginx Status:"
-sudo systemctl status nginx --no-pager -l
-echo ""
-echo "Database Status:"
-sudo -u postgres psql -c "SELECT COUNT(*) as active_connections FROM pg_stat_activity WHERE datname='$DB_NAME';"
-echo ""
-echo "Disk Usage:"
-df -h $INSTALL_DIR
-EOFSCRIPT
-
-chmod +x $INSTALL_DIR/status.sh
-
-log_success "Management scripts created!"
-
-#######################################
-# 10. Setup Cron Jobs
-#######################################
-log_info "Step 10: Setting up automated tasks..."
-
-# Add backup cron job (daily at 2 AM)
-(crontab -l 2>/dev/null; echo "0 2 * * * $INSTALL_DIR/backup.sh >> $INSTALL_DIR/logs/backup.log 2>&1") | crontab -
-
-mkdir -p $INSTALL_DIR/logs
-
-log_success "Automated backup scheduled!"
-
-#######################################
-# Final Steps
-#######################################
-log_info "Performing final checks..."
-
-# Test API
-sleep 3
-if curl -f http://localhost:$API_PORT/api/health > /dev/null 2>&1; then
-    log_success "Backend API is responding!"
+if command -v ufw &> /dev/null; then
+    sudo ufw allow 'Nginx Full'
+    sudo ufw allow OpenSSH
+    sudo ufw --force enable
+    log_success "Firewall configured!"
 else
-    log_warning "Backend API health check failed. Check logs with: pm2 logs recycling-api"
+    log_warning "UFW not installed. Please configure your firewall manually."
 fi
 
-# Create deployment info file
-cat > $INSTALL_DIR/DEPLOYMENT_INFO.txt <<EOF
-Recycling Management System - Deployment Information
-====================================================
+############################################
+# 10. Final Steps
+############################################
+log_info "Step 10: Final configuration..."
 
-Deployed: $(date)
-Domain: $DOMAIN_NAME
-Installation Directory: $INSTALL_DIR
+# Create upload directories
+mkdir -p $INSTALL_DIR/backend/uploads/{profiles,documents}
 
-Database:
-  Name: $DB_NAME
-  User: $DB_USER
-  
-API:
-  Port: $API_PORT
-  URL: https://$DOMAIN_NAME/api
+# Set permissions
+sudo chown -R $USER:www-data $INSTALL_DIR
+sudo chmod -R 755 $INSTALL_DIR
 
-Management Commands:
-  Status: $INSTALL_DIR/status.sh
-  Update: $INSTALL_DIR/update.sh
-  Backup: $INSTALL_DIR/backup.sh
-  
-  PM2 Commands:
-    - pm2 status
-    - pm2 logs recycling-api
-    - pm2 restart recycling-api
-    
-  Nginx Commands:
-    - sudo systemctl status nginx
-    - sudo systemctl restart nginx
-    - sudo nginx -t
-    
-Default Admin Credentials:
-  Email: admin@example.com
-  Password: admin123
-  
-  ⚠️  IMPORTANT: Change the default admin password immediately after first login!
+log_success "Permissions configured!"
 
-Application URLs:
-  Frontend: https://$DOMAIN_NAME
-  API: https://$DOMAIN_NAME/api
-  Health Check: https://$DOMAIN_NAME/api/health
-
-Logs Location:
-  Application: pm2 logs recycling-api
-  Nginx Access: /var/log/nginx/access.log
-  Nginx Error: /var/log/nginx/error.log
-  Backup Logs: $INSTALL_DIR/logs/backup.log
-
-Backup Location: $HOME/backups/recycling
-Backup Schedule: Daily at 2:00 AM
-
-SSL Certificate: $([ "$INSTALL_SSL" = "y" ] && echo "Installed (Let's Encrypt)" || echo "Not installed")
-Auto-renewal: $([ "$INSTALL_SSL" = "y" ] && echo "Enabled" || echo "N/A")
-EOF
-
+############################################
+# Deployment Complete
+############################################
 echo ""
+echo "==========================================="
+log_success "Deployment Complete!"
+echo "==========================================="
 echo ""
-log_success "========================================"
-log_success "   DEPLOYMENT COMPLETED SUCCESSFULLY!   "
-log_success "========================================"
-echo ""
-log_info "Deployment Information:"
-cat $INSTALL_DIR/DEPLOYMENT_INFO.txt
-echo ""
-log_info "Next Steps:"
-echo "  1. Visit https://$DOMAIN_NAME to access the application"
-echo "  2. Login with default credentials (see above)"
-echo "  3. Change the default admin password immediately"
-echo "  4. Configure materials, locations, and pricing in the Admin Panel"
+log_info "Application Details:"
+echo "  URL: https://$DOMAIN_NAME"
+echo "  Installation Path: $INSTALL_DIR"
+echo "  Backend Port: $API_PORT"
+echo "  Database: $DB_NAME"
 echo ""
 log_info "Useful Commands:"
-echo "  - View status: $INSTALL_DIR/status.sh"
-echo "  - Update app: $INSTALL_DIR/update.sh"
-echo "  - Create backup: $INSTALL_DIR/backup.sh"
-echo "  - View logs: pm2 logs recycling-api"
+echo "  View backend logs: pm2 logs recycling-backend"
+echo "  Restart backend: pm2 restart recycling-backend"
+echo "  View PM2 status: pm2 status"
+echo "  View Nginx logs: sudo tail -f /var/log/nginx/error.log"
 echo ""
-log_success "Happy recycling! 🌍♻️"
+
+if [ "$IS_UPGRADE" = true ]; then
+    log_info "Backup Location: $BACKUP_DIR"
+    log_warning "If everything works correctly, you can remove the backup with:"
+    echo "  sudo rm -rf $BACKUP_DIR"
+    echo ""
+fi
+
+log_info "Next Steps:"
+echo "  1. Configure email settings in $INSTALL_DIR/backend/.env"
+echo "  2. Set up regular backups"
+echo "  3. Configure monitoring"
+echo "  4. Review security settings"
+echo ""
+log_success "Your Recycling Management System is now deployed and running!"
