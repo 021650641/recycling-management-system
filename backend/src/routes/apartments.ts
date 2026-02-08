@@ -5,7 +5,7 @@ import { authenticate, authorize } from '../middleware/auth';
 const router = Router();
 router.use(authenticate);
 
-router.get('/', async (req, res, next) => {
+router.get('/', async (_req, res, next) => {
   try {
     const result = await query('SELECT * FROM apartment_complex WHERE is_active = true ORDER BY name');
     res.json({ apartments: result.rows });
@@ -14,7 +14,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', async (req, res, next): Promise<any> => {
   try {
     const result = await query('SELECT * FROM apartment_complex WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) {
