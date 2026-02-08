@@ -32,7 +32,7 @@ router.get('/', async (req: any, res, next) => {
 });
 
 // Get inventory by location and material
-router.get('/:locationId/:materialId', async (req, res, next) => {
+router.get('/:locationId/:materialId', async (req, res, next): Promise<any> => {
   try {
     const result = await query(
       'SELECT * FROM inventory WHERE location_id = $1 AND material_category_id = $2',
