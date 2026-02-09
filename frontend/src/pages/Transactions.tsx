@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { Plus, Filter, Download, Search } from 'lucide-react';
+import { Plus, Filter, Search } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function Transactions() {
@@ -22,7 +22,7 @@ export default function Transactions() {
   };
 
   const filteredTransactions = transactions?.filter(transaction => {
-    const matchesSearch = 
+    const matchesSearch =
       searchTerm === '' ||
       transaction.supplierName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       transaction.vehicleNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
