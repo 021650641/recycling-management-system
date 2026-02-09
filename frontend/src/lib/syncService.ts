@@ -2,7 +2,7 @@ import { db } from './db';
 import { syncAPI } from './api';
 
 class SyncService {
-  private syncInterval: ReturnType<typeof setInterval> | null = null;
+  private syncInterval: number | null = null;
   private isSyncing = false;
 
   async initialize() {
@@ -24,7 +24,7 @@ class SyncService {
     try {
       // Push local changes
       await this.pushChanges();
-
+      
       // Pull remote changes
       await this.pullChanges();
     } catch (error) {
