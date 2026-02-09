@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { inventoryAPI } from '@/lib/api';
-import { Package, AlertTriangle, TrendingUp, TrendingDown, MapPin } from 'lucide-react';
+import { Package, AlertTriangle, MapPin } from 'lucide-react';
 
 export default function Inventory() {
   const [inventoryData, setInventoryData] = useState<any[]>([]);
@@ -122,7 +122,7 @@ export default function Inventory() {
               <p className="text-xs text-gray-500 mt-1">estimated</p>
             </div>
             <div className="p-3 bg-green-100 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-green-600" />
+              <Package className="w-6 h-6 text-green-600" />
             </div>
           </div>
         </div>
