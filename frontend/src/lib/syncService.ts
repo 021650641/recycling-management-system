@@ -2,7 +2,7 @@ import { db } from './db';
 import { syncAPI } from './api';
 
 class SyncService {
-  private syncInterval: NodeJS.Timeout | null = null;
+  private syncInterval: number | null = null;
   private isSyncing = false;
 
   async initialize() {
