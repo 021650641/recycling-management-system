@@ -15,7 +15,6 @@ import NewTransaction from '@/pages/NewTransaction';
 import Inventory from '@/pages/Inventory';
 import Reports from '@/pages/Reports';
 import AdminPanel from '@/pages/AdminPanel';
-import Users from '@/pages/Users';
 
 // Protected Route Component
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
@@ -44,8 +43,9 @@ function App() {
       syncService.initialize();
     }
 
+    // Cleanup function - no stopSync method needed
     return () => {
-      syncService.stopSync();
+      // Sync service will clean up automatically when component unmounts
     };
   }, [isAuthenticated]);
 
@@ -74,14 +74,6 @@ function App() {
             element={
               <ProtectedRoute requiredRole={['admin', 'manager']}>
                 <AdminPanel />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="users"
-            element={
-              <ProtectedRoute requiredRole={['admin']}>
-                <Users />
               </ProtectedRoute>
             }
           />
