@@ -1,4 +1,4 @@
-import { db, Transaction, SyncQueue } from './db';
+import { db } from './db';
 import { syncAPI } from './api';
 
 class SyncService {
@@ -111,52 +111,9 @@ class SyncService {
     }
   }
 
-  async addToQueue(endpoint: string, method: 'POST' | 'PUT' | 'DELETE', data: any) {
-    await db.syncQueue.add({
-      endpoint,
-      method,
-      data,
-      retryCount: 0,
-      createdAt: new Date().toISOString(),
-    });
-  }
-
-  async processSyncQueue() {
-    const queueItems = await db.syncQueue.toArray();
-    
-    for (const item of queueItems) {
-      try {
-        // Process the queued request
-        // This would use the api client to make the actual request
-        
-        // If successful, remove from queue
-        if (item.id) {
-          await db.syncQueue.delete(item.id);
-        }
-      } catch (error) {
-        // Increment retry count
-        if (item.id) {
-          await db.syncQueue.update(item.id, {
-            retryCount: item.retryCount + 1,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
-        }
-      }
-    }
-  }
-
-  getSyncStatus() {
-    return {
-      isSyncing: this.isSyncing,
-      isOnline: navigator.onLine,
-      lastSyncTime: localStorage.getItem('lastSyncTime'),
-    };
-  }
-
-  stopSync() {
+  stop() {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
-      this.syncInterval = null;
     }
   }
 }
