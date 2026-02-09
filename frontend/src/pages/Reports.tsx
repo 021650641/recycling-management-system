@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { reportsAPI } from '@/lib/api';
-import { Download, Calendar, Filter, TrendingUp, DollarSign } from 'lucide-react';
+import { Download, Calendar, TrendingUp, DollarSign } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
@@ -137,7 +137,7 @@ export default function Reports() {
                 ${((summary?.totalSaleAmount || 0) - (summary?.totalPurchaseAmount || 0)).toFixed(2)}
               </p>
               <p className="text-sm text-purple-600 mt-2">
-                Profit Margin: {summary?.totalSaleAmount ? 
+                Profit Margin: {summary?.totalSaleAmount ?
                   (((summary.totalSaleAmount - summary.totalPurchaseAmount) / summary.totalSaleAmount) * 100).toFixed(1) : 0}%
               </p>
             </div>
