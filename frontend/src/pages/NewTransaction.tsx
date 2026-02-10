@@ -15,6 +15,8 @@ export default function NewTransaction() {
   const [locations, setLocations] = useState<any[]>([]);
   const [wastePickers, setWastePickers] = useState<any[]>([]);
   const [apartments, setApartments] = useState<any[]>([]);
+  const [units, setUnits] = useState<any[]>([]);
+  const [loadingUnits, setLoadingUnits] = useState(false);
 
   useEffect(() => {
     loadFormData();
@@ -45,7 +47,7 @@ export default function NewTransaction() {
     sourceType: 'waste_picker' as 'waste_picker' | 'apartment',
     wastePickerId: '',
     apartmentComplexId: '',
-    apartmentUnit: '',
+    apartmentUnitId: '',
     materialId: '',
     locationId: '',
     quantity: '',
@@ -69,6 +71,19 @@ export default function NewTransaction() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Load units when apartment complex changes
+  useEffect(() => {
+    if (formData.apartmentComplexId) {
+      setLoadingUnits(true);
+      apartmentsAPI.getUnits(formData.apartmentComplexId)
+        .then(res => setUnits(res.data?.units || []))
+        .catch(() => setUnits([]))
+        .finally(() => setLoadingUnits(false));
+    } else {
+      setUnits([]);
+    }
+  }, [formData.apartmentComplexId]);
 
   useEffect(() => {
     if (formData.materialId && isOnline) {
@@ -134,7 +149,7 @@ export default function NewTransaction() {
       transactionData.wastePickerId = formData.wastePickerId;
     } else {
       transactionData.apartmentComplexId = formData.apartmentComplexId;
-      transactionData.apartmentUnit = formData.apartmentUnit || undefined;
+      transactionData.apartmentUnitId = formData.apartmentUnitId || undefined;
     }
 
     setIsSubmitting(true);
@@ -206,7 +221,7 @@ export default function NewTransaction() {
           <div className="grid grid-cols-2 gap-4">
             <button
               type="button"
-              onClick={() => setFormData(prev => ({ ...prev, sourceType: 'waste_picker', apartmentComplexId: '', apartmentUnit: '' }))}
+              onClick={() => setFormData(prev => ({ ...prev, sourceType: 'waste_picker', apartmentComplexId: '', apartmentUnitId: '' }))}
               className={`p-4 border-2 rounded-lg font-medium transition-colors ${
                 formData.sourceType === 'waste_picker'
                   ? 'border-primary-600 bg-primary-50 text-primary-700'
@@ -262,7 +277,7 @@ export default function NewTransaction() {
                 id="apartmentComplexId"
                 name="apartmentComplexId"
                 value={formData.apartmentComplexId}
-                onChange={handleChange}
+                onChange={(e) => setFormData(prev => ({ ...prev, apartmentComplexId: e.target.value, apartmentUnitId: '' }))}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
                 required
               >
@@ -276,18 +291,25 @@ export default function NewTransaction() {
               </select>
             </div>
             <div>
-              <label htmlFor="apartmentUnit" className="block text-sm font-medium text-gray-700 mb-2">
-                Unit Number
+              <label htmlFor="apartmentUnitId" className="block text-sm font-medium text-gray-700 mb-2">
+                Unit {loadingUnits && '(loading...)'}
               </label>
-              <input
-                id="apartmentUnit"
-                name="apartmentUnit"
-                type="text"
-                value={formData.apartmentUnit}
+              <select
+                id="apartmentUnitId"
+                name="apartmentUnitId"
+                value={formData.apartmentUnitId}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                placeholder="e.g. 4B, 12, Unit 3"
-              />
+                disabled={!formData.apartmentComplexId || loadingUnits}
+              >
+                <option value="">Select unit (optional)</option>
+                {units.filter(u => u.is_active).map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    Unit {unit.unit_number}
+                    {unit.resident_name ? ` - ${unit.resident_name}` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         )}

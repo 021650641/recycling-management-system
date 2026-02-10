@@ -158,7 +158,7 @@ router.get('/payment-history', authorize('admin', 'manager'), async (req, res, n
 // Traceability report - full chain from source to buyer
 router.get('/traceability', async (req, res, next) => {
   try {
-    const { apartmentId, wastePickerId, materialId, startDate, endDate, days = 42 } = req.query;
+    const { apartmentId, unitId, wastePickerId, materialId, startDate, endDate, days = 42 } = req.query;
 
     let queryText = `
       SELECT
@@ -167,12 +167,15 @@ router.get('/traceability', async (req, res, next) => {
         t.transaction_date,
         t.source_type,
         CASE
-          WHEN t.source_type = 'apartment' THEN ac.name || COALESCE(' - Unit ' || t.apartment_unit, '')
+          WHEN t.source_type = 'apartment' THEN ac.name || COALESCE(' - Unit ' || COALESCE(au.unit_number, t.apartment_unit), '')
           WHEN t.source_type = 'waste_picker' THEN wp.first_name || ' ' || wp.last_name
         END AS source_name,
         ac.id AS apartment_id,
         ac.name AS apartment_name,
-        t.apartment_unit,
+        t.apartment_unit_id,
+        au.unit_number AS apartment_unit_number,
+        au.resident_name AS apartment_resident_name,
+        t.apartment_unit AS apartment_unit_legacy,
         wp.id AS waste_picker_id,
         wp.first_name || ' ' || wp.last_name AS waste_picker_name,
         l.id AS location_id,
@@ -188,6 +191,7 @@ router.get('/traceability', async (req, res, next) => {
       JOIN location l ON t.location_id = l.id
       JOIN material_category mc ON t.material_category_id = mc.id
       LEFT JOIN apartment_complex ac ON t.apartment_complex_id = ac.id
+      LEFT JOIN apartment_unit au ON t.apartment_unit_id = au.id
       LEFT JOIN waste_picker wp ON t.waste_picker_id = wp.id
       WHERE 1=1
     `;
@@ -197,6 +201,10 @@ router.get('/traceability', async (req, res, next) => {
     if (apartmentId) {
       params.push(apartmentId);
       queryText += ` AND t.apartment_complex_id = $${paramCount++}`;
+    }
+    if (unitId) {
+      params.push(unitId);
+      queryText += ` AND t.apartment_unit_id = $${paramCount++}`;
     }
     if (wastePickerId) {
       params.push(wastePickerId);
@@ -222,14 +230,16 @@ router.get('/traceability', async (req, res, next) => {
 
     const result = await query(queryText, params);
 
-    // Also get aggregated summary grouped by source + material
+    // Aggregated summary grouped by source + unit + material
     let summaryQuery = `
       SELECT
         t.source_type,
         CASE
-          WHEN t.source_type = 'apartment' THEN ac.name || COALESCE(' - Unit ' || t.apartment_unit, '')
+          WHEN t.source_type = 'apartment' THEN ac.name || COALESCE(' - Unit ' || COALESCE(au.unit_number, t.apartment_unit), '')
           WHEN t.source_type = 'waste_picker' THEN wp.first_name || ' ' || wp.last_name
         END AS source_name,
+        au.unit_number,
+        au.resident_name,
         mc.name AS material_category,
         SUM(t.weight_kg) AS total_weight_kg,
         COUNT(t.id) AS transaction_count,
@@ -239,20 +249,21 @@ router.get('/traceability', async (req, res, next) => {
       FROM transaction t
       JOIN material_category mc ON t.material_category_id = mc.id
       LEFT JOIN apartment_complex ac ON t.apartment_complex_id = ac.id
+      LEFT JOIN apartment_unit au ON t.apartment_unit_id = au.id
       LEFT JOIN waste_picker wp ON t.waste_picker_id = wp.id
       WHERE 1=1
     `;
-    // Reuse same filters (rebuild params)
     const summaryParams: any[] = [];
     let sParamCount = 1;
     if (apartmentId) { summaryParams.push(apartmentId); summaryQuery += ` AND t.apartment_complex_id = $${sParamCount++}`; }
+    if (unitId) { summaryParams.push(unitId); summaryQuery += ` AND t.apartment_unit_id = $${sParamCount++}`; }
     if (wastePickerId) { summaryParams.push(wastePickerId); summaryQuery += ` AND t.waste_picker_id = $${sParamCount++}`; }
     if (materialId) { summaryParams.push(materialId); summaryQuery += ` AND t.material_category_id = $${sParamCount++}`; }
     if (startDate) { summaryParams.push(startDate); summaryQuery += ` AND t.transaction_date >= $${sParamCount++}`; }
     else if (!endDate) { summaryParams.push(days); summaryQuery += ` AND t.transaction_date >= CURRENT_DATE - ($${sParamCount++} || ' days')::INTERVAL`; }
     if (endDate) { summaryParams.push(endDate); summaryQuery += ` AND t.transaction_date <= $${sParamCount++}`; }
 
-    summaryQuery += ` GROUP BY t.source_type, source_name, mc.name
+    summaryQuery += ` GROUP BY t.source_type, source_name, au.unit_number, au.resident_name, mc.name
                       ORDER BY total_weight_kg DESC`;
 
     const summaryResult = await query(summaryQuery, summaryParams);

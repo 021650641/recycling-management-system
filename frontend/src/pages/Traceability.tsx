@@ -11,7 +11,10 @@ interface TraceTransaction {
   source_name: string;
   apartment_id: string;
   apartment_name: string;
-  apartment_unit: string;
+  apartment_unit_id: string;
+  apartment_unit_number: string;
+  apartment_resident_name: string;
+  apartment_unit_legacy: string;
   waste_picker_id: string;
   waste_picker_name: string;
   location_id: number;
@@ -28,6 +31,8 @@ interface TraceTransaction {
 interface TraceSummary {
   source_type: string;
   source_name: string;
+  unit_number: string;
+  resident_name: string;
   material_category: string;
   total_weight_kg: number;
   transaction_count: number;
@@ -44,10 +49,12 @@ export default function Traceability() {
 
   const [wastePickers, setWastePickers] = useState<any[]>([]);
   const [apartments, setApartments] = useState<any[]>([]);
+  const [units, setUnits] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
 
   const [filters, setFilters] = useState({
     apartmentId: '',
+    unitId: '',
     wastePickerId: '',
     materialId: '',
     startDate: '',
@@ -58,6 +65,17 @@ export default function Traceability() {
   useEffect(() => {
     loadFilterOptions();
   }, []);
+
+  // Load units when apartment filter changes
+  useEffect(() => {
+    if (filters.apartmentId) {
+      apartmentsAPI.getUnits(filters.apartmentId)
+        .then(res => setUnits(res.data?.units || []))
+        .catch(() => setUnits([]));
+    } else {
+      setUnits([]);
+    }
+  }, [filters.apartmentId]);
 
   const loadFilterOptions = async () => {
     try {
@@ -80,6 +98,7 @@ export default function Traceability() {
     try {
       const params: any = {};
       if (filters.apartmentId) params.apartmentId = filters.apartmentId;
+      if (filters.unitId) params.unitId = filters.unitId;
       if (filters.wastePickerId) params.wastePickerId = filters.wastePickerId;
       if (filters.materialId) params.materialId = filters.materialId;
       if (filters.startDate) params.startDate = filters.startDate;
@@ -100,12 +119,14 @@ export default function Traceability() {
   const clearFilters = () => {
     setFilters({
       apartmentId: '',
+      unitId: '',
       wastePickerId: '',
       materialId: '',
       startDate: '',
       endDate: '',
       days: '42',
     });
+    setUnits([]);
   };
 
   return (
@@ -131,15 +152,31 @@ export default function Traceability() {
         <form onSubmit={handleSearch} className="bg-white p-6 rounded-lg shadow space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Source (Apartment)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Source (Apartment Complex)</label>
               <select
                 value={filters.apartmentId}
-                onChange={(e) => setFilters({ ...filters, apartmentId: e.target.value })}
+                onChange={(e) => setFilters({ ...filters, apartmentId: e.target.value, unitId: '' })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
               >
-                <option value="">All apartments</option>
+                <option value="">All complexes</option>
                 {apartments.map((a) => (
                   <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Specific Unit</label>
+              <select
+                value={filters.unitId}
+                onChange={(e) => setFilters({ ...filters, unitId: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                disabled={!filters.apartmentId}
+              >
+                <option value="">All units</option>
+                {units.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    Unit {u.unit_number}{u.resident_name ? ` - ${u.resident_name}` : ''}
+                  </option>
                 ))}
               </select>
             </div>
@@ -187,25 +224,28 @@ export default function Traceability() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Last N Days</label>
-              <input
-                type="number"
-                value={filters.days}
-                onChange={(e) => setFilters({ ...filters, days: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                placeholder="42"
-                disabled={!!filters.startDate || !!filters.endDate}
-              />
-            </div>
           </div>
-          <div className="flex gap-2">
-            <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
-              <Search className="w-4 h-4" /> Search
-            </button>
-            <button type="button" onClick={clearFilters} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">
-              Clear
-            </button>
+          <div className="flex items-center gap-4">
+            <div className="flex gap-2">
+              <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
+                <Search className="w-4 h-4" /> Search
+              </button>
+              <button type="button" onClick={clearFilters} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">
+                Clear
+              </button>
+            </div>
+            {!filters.startDate && !filters.endDate && (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <span>Last</span>
+                <input
+                  type="number"
+                  value={filters.days}
+                  onChange={(e) => setFilters({ ...filters, days: e.target.value })}
+                  className="w-16 px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-center"
+                />
+                <span>days</span>
+              </div>
+            )}
           </div>
         </form>
       )}
@@ -213,7 +253,7 @@ export default function Traceability() {
       {/* Summary Cards */}
       {summary.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Summary</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">Summary by Source & Material</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {summary.map((s, i) => (
               <div key={i} className="bg-white rounded-lg shadow p-4">
@@ -223,6 +263,9 @@ export default function Traceability() {
                       {s.source_type === 'apartment' ? 'Apartment' : 'Waste Picker'}
                     </p>
                     <p className="text-base font-semibold text-gray-900">{s.source_name || 'Unknown'}</p>
+                    {s.resident_name && (
+                      <p className="text-xs text-gray-500">Resident: {s.resident_name}</p>
+                    )}
                   </div>
                   <span className="px-2 py-1 text-xs font-semibold rounded-full bg-primary-100 text-primary-800">
                     {s.material_category}
@@ -272,7 +315,7 @@ export default function Traceability() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction #</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit / Resident</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Weight (kg)</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cost</th>
@@ -288,13 +331,24 @@ export default function Traceability() {
                       <td className="px-4 py-3 text-sm font-mono text-gray-900">{t.transaction_number}</td>
                       <td className="px-4 py-3 text-sm text-gray-900">
                         <div>
-                          <p>{t.source_name || '-'}</p>
+                          <p>{t.source_type === 'apartment' ? t.apartment_name : t.waste_picker_name || '-'}</p>
                           <p className="text-xs text-gray-500">
                             {t.source_type === 'apartment' ? 'Apartment' : 'Waste Picker'}
                           </p>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{t.location_name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {t.source_type === 'apartment' ? (
+                          <div>
+                            <p>{t.apartment_unit_number ? `Unit ${t.apartment_unit_number}` : t.apartment_unit_legacy || '-'}</p>
+                            {t.apartment_resident_name && (
+                              <p className="text-xs text-gray-500">{t.apartment_resident_name}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
                         <div>
                           <p>{t.material_category}</p>

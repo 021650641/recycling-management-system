@@ -16,6 +16,7 @@ router.post('/', authorize('admin', 'manager', 'operator'), async (req: any, res
       sourceType,
       apartmentComplexId,
       apartmentUnit,
+      apartmentUnitId,
       wastePickerId,
       weightKg,
       qualityGrade,
@@ -55,14 +56,14 @@ router.post('/', authorize('admin', 'manager', 'operator'), async (req: any, res
     const result = await query(
       `INSERT INTO transaction (
         location_id, material_category_id, source_type,
-        apartment_complex_id, apartment_unit, waste_picker_id,
+        apartment_complex_id, apartment_unit, apartment_unit_id, waste_picker_id,
         weight_kg, quality_grade, unit_price, total_cost,
         payment_method, notes, recorded_by, device_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *`,
       [
         locationId, materialCategoryId, sourceType,
-        apartmentComplexId, apartmentUnit, wastePickerId,
+        apartmentComplexId, apartmentUnit, apartmentUnitId || null, wastePickerId,
         weightKg, qualityGrade || 'standard', unitPrice, totalCost,
         paymentMethod, notes, req.user.id, deviceId
       ]

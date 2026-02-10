@@ -128,6 +128,13 @@ export const apartmentsAPI = {
   create: (data: any) => api.post('/apartments', data),
   update: (id: string, data: any) => api.put(`/apartments/${id}`, data),
   delete: (id: string) => api.delete(`/apartments/${id}`),
+  // Units within a complex
+  getUnits: (complexId: string) => api.get(`/apartments/${complexId}/units`),
+  getUnit: (complexId: string, unitId: string) => api.get(`/apartments/${complexId}/units/${unitId}`),
+  createUnit: (complexId: string, data: any) => api.post(`/apartments/${complexId}/units`, data),
+  updateUnit: (complexId: string, unitId: string, data: any) => api.put(`/apartments/${complexId}/units/${unitId}`, data),
+  deleteUnit: (complexId: string, unitId: string) => api.delete(`/apartments/${complexId}/units/${unitId}`),
+  bulkCreateUnits: (complexId: string, units: any[]) => api.post(`/apartments/${complexId}/units/bulk`, { units }),
 };
 
 // Sales API
