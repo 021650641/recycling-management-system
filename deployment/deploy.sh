@@ -198,19 +198,25 @@ if [ "$IS_UPGRADE" = true ]; then
     fi
 fi
 
-# Create installation directory
+# Detect the source repository (where this script lives)
+SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Set up installation directory
 sudo mkdir -p $INSTALL_DIR
 sudo chown -R $USER:$USER $INSTALL_DIR
 
-# Clone repository
-log_info "Cloning repository..."
 if [ "$IS_UPGRADE" = true ]; then
+    log_info "Pulling latest code..."
     cd $INSTALL_DIR
     git fetch origin
     git reset --hard origin/main
     git pull origin main
+elif [ "$SOURCE_DIR" != "$INSTALL_DIR" ]; then
+    log_info "Copying repository to installation directory..."
+    cp -a "$SOURCE_DIR/." "$INSTALL_DIR/"
+    cd $INSTALL_DIR
 else
-    git clone https://github.com/021650641/recycling-management-system.git $INSTALL_DIR
+    log_info "Already running from installation directory"
     cd $INSTALL_DIR
 fi
 
