@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { transactionsAPI, pricesAPI, materialsAPI, locationsAPI } from '@/lib/api';
+import { transactionsAPI, materialsAPI, locationsAPI, api } from '@/lib/api';
 import { db } from '@/lib/db';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
@@ -70,12 +70,19 @@ export default function NewTransaction() {
 
   const fetchCurrentPrice = async () => {
     try {
-      const response = await pricesAPI.getByMaterial(parseInt(formData.materialId));
-      if (response.data) {
-        const price = formData.type === 'purchase' 
-          ? response.data.purchasePrice 
-          : response.data.salePrice;
-        setFormData(prev => ({ ...prev, unitPrice: price.toString() }));
+      // Prices are at /materials/prices, not /prices/material/:id
+      const response = await api.get('/materials/prices', {
+        params: { date: new Date().toISOString().split('T')[0] }
+      });
+      const prices = Array.isArray(response.data) ? response.data : response.data?.prices || [];
+      const materialPrice = prices.find((p: any) => p.material_category_id === formData.materialId);
+      if (materialPrice) {
+        const price = formData.type === 'purchase'
+          ? materialPrice.purchase_price_per_kg
+          : materialPrice.sale_price_per_kg;
+        if (price) {
+          setFormData(prev => ({ ...prev, unitPrice: price.toString() }));
+        }
       }
     } catch (error) {
       console.error('Failed to fetch price:', error);

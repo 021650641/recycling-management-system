@@ -15,6 +15,7 @@ import NewTransaction from '@/pages/NewTransaction';
 import Inventory from '@/pages/Inventory';
 import Reports from '@/pages/Reports';
 import AdminPanel from '@/pages/AdminPanel';
+import UsersPage from '@/pages/Users';
 
 // Protected Route Component
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
@@ -74,6 +75,14 @@ function App() {
             element={
               <ProtectedRoute requiredRole={['admin', 'manager']}>
                 <AdminPanel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="users"
+            element={
+              <ProtectedRoute requiredRole={['admin']}>
+                <UsersPage />
               </ProtectedRoute>
             }
           />

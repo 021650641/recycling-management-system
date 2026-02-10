@@ -23,14 +23,16 @@ export default function Reports() {
     setLoading(true);
     try {
       const [summaryRes, trendsRes, paymentsRes] = await Promise.all([
-        reportsAPI.getSummary(dateRange),
-        reportsAPI.getTrends(dateRange),
-        reportsAPI.getPendingPayments(),
+        reportsAPI.getSummary(dateRange).catch(() => ({ data: null })),
+        reportsAPI.getTrends(dateRange).catch(() => ({ data: { trends: [] } })),
+        reportsAPI.getPendingPayments().catch(() => ({ data: { payments: [] } })),
       ]);
 
       setSummary(summaryRes.data);
-      setTrends(trendsRes.data);
-      setPendingPayments(paymentsRes.data);
+      const trendsData = Array.isArray(trendsRes.data) ? trendsRes.data : trendsRes.data?.trends || [];
+      setTrends(trendsData);
+      const paymentsData = Array.isArray(paymentsRes.data) ? paymentsRes.data : paymentsRes.data?.payments || [];
+      setPendingPayments(paymentsData);
     } catch (error) {
       console.error('Failed to load reports:', error);
       toast.error('Failed to load reports');
@@ -116,39 +118,26 @@ export default function Reports() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-lg shadow">
-              <p className="text-sm text-gray-600">Total Purchases</p>
-              <p className="text-2xl font-bold text-gray-900">{summary?.totalPurchases || 0}</p>
-              <p className="text-sm text-green-600 mt-2">
-                ${(summary?.totalPurchaseAmount || 0).toFixed(2)}
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow">
-              <p className="text-sm text-gray-600">Total Sales</p>
-              <p className="text-2xl font-bold text-gray-900">{summary?.totalSales || 0}</p>
-              <p className="text-sm text-blue-600 mt-2">
-                ${(summary?.totalSaleAmount || 0).toFixed(2)}
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow">
-              <p className="text-sm text-gray-600">Net Revenue</p>
+              <p className="text-sm text-gray-600">Total Materials</p>
               <p className="text-2xl font-bold text-gray-900">
-                ${((summary?.totalSaleAmount || 0) - (summary?.totalPurchaseAmount || 0)).toFixed(2)}
-              </p>
-              <p className="text-sm text-purple-600 mt-2">
-                Profit Margin: {summary?.totalSaleAmount ?
-                  (((summary.totalSaleAmount - summary.totalPurchaseAmount) / summary.totalSaleAmount) * 100).toFixed(1) : 0}%
+                {(summary?.totalMaterialsKg || 0).toFixed(2)} kg
               </p>
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow">
-              <p className="text-sm text-gray-600">Total Material Weight</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {(summary?.totalWeight || 0).toFixed(2)} kg
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                Avg: ${summary?.totalWeight ? ((summary.totalPurchaseAmount + summary.totalSaleAmount) / summary.totalWeight).toFixed(2) : 0}/kg
+              <p className="text-sm text-gray-600">Active Locations</p>
+              <p className="text-2xl font-bold text-gray-900">{summary?.activeLocations || 0}</p>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow">
+              <p className="text-sm text-gray-600">Active Waste Pickers</p>
+              <p className="text-2xl font-bold text-gray-900">{summary?.activeWastePickers || 0}</p>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow">
+              <p className="text-sm text-gray-600">Pending Payments</p>
+              <p className="text-2xl font-bold text-red-600">
+                ${(summary?.pendingPayments || 0).toFixed(2)}
               </p>
             </div>
           </div>
@@ -167,8 +156,8 @@ export default function Reports() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="purchases" stroke="#10b981" name="Purchases" />
-                  <Line type="monotone" dataKey="sales" stroke="#3b82f6" name="Sales" />
+                  <Line type="monotone" dataKey="total_weight_kg" stroke="#10b981" name="Weight (kg)" />
+                  <Line type="monotone" dataKey="total_transactions" stroke="#3b82f6" name="Transactions" />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -180,7 +169,7 @@ export default function Reports() {
           <div className="bg-white p-6 rounded-lg shadow">
             <div className="flex items-center gap-2 mb-4">
               <DollarSign className="w-5 h-5 text-gray-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Revenue Analysis</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Value Analysis</h2>
             </div>
             {trends.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
@@ -190,12 +179,11 @@ export default function Reports() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="purchaseAmount" fill="#10b981" name="Purchase Amount" />
-                  <Bar dataKey="saleAmount" fill="#3b82f6" name="Sale Amount" />
+                  <Bar dataKey="total_value" fill="#10b981" name="Total Value ($)" />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-center py-8 text-gray-500">No revenue data available</p>
+              <p className="text-center py-8 text-gray-500">No value data available</p>
             )}
           </div>
 
@@ -212,13 +200,13 @@ export default function Reports() {
                       Date
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Type
+                      Waste Picker
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Supplier/Customer
+                      Material
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Amount
+                      Total Cost
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Paid
@@ -227,12 +215,12 @@ export default function Reports() {
                       Outstanding
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Days Pending
+                      Status
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {!pendingPayments || pendingPayments.length === 0 ? (
+                  {pendingPayments.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                         No pending payments
@@ -240,41 +228,40 @@ export default function Reports() {
                     </tr>
                   ) : (
                     pendingPayments.map((payment, index) => {
-                      const outstanding = payment.totalAmount - (payment.paidAmount || 0);
-                      const daysPending = Math.floor(
-                        (new Date().getTime() - new Date(payment.createdAt).getTime()) / (1000 * 60 * 60 * 24)
-                      );
+                      const totalCost = parseFloat(payment.total_cost) || 0;
+                      const paidAmount = parseFloat(payment.paid_amount) || 0;
+                      const amountDue = parseFloat(payment.amount_due) || (totalCost - paidAmount);
 
                       return (
-                        <tr key={index} className="hover:bg-gray-50">
+                        <tr key={payment.transaction_id || index} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            {format(new Date(payment.createdAt), 'MMM dd, yyyy')}
+                            {payment.transaction_date ? format(new Date(payment.transaction_date), 'MMM dd, yyyy') : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {payment.waste_picker_name || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {payment.material_category || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                            ${totalCost.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-green-600">
+                            ${paidAmount.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-red-600">
+                            ${amountDue.toFixed(2)}
                           </td>
                           <td className="px-4 py-3">
                             <span
                               className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                payment.type === 'purchase'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-blue-100 text-blue-800'
+                                payment.payment_status === 'partial'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-red-100 text-red-800'
                               }`}
                             >
-                              {payment.type}
+                              {payment.payment_status}
                             </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {payment.supplierName || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                            ${payment.totalAmount.toFixed(2)}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-green-600">
-                            ${(payment.paidAmount || 0).toFixed(2)}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-red-600">
-                            ${outstanding.toFixed(2)}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {daysPending} days
                           </td>
                         </tr>
                       );

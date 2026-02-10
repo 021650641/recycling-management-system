@@ -1,67 +1,64 @@
 import { useState, useEffect } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
-import { inventoryAPI } from '@/lib/api';
+import { inventoryAPI, locationsAPI } from '@/lib/api';
 import { Package, AlertTriangle, MapPin } from 'lucide-react';
 
 export default function Inventory() {
   const [inventoryData, setInventoryData] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
 
-  const materials = useLiveQuery(() => db.materials.where('isActive').equals(1).toArray(), []);
-  const locations = useLiveQuery(() => db.locations.where('isActive').equals(1).toArray(), []);
+  useEffect(() => {
+    loadLocations();
+  }, []);
 
   useEffect(() => {
     loadInventory();
   }, [selectedLocation]);
+
+  const loadLocations = async () => {
+    try {
+      const response = await locationsAPI.getAll();
+      const data = Array.isArray(response.data) ? response.data : response.data?.locations || [];
+      setLocations(data.filter((l: any) => l.is_active !== false));
+    } catch (error) {
+      console.error('Failed to load locations:', error);
+    }
+  };
 
   const loadInventory = async () => {
     setLoading(true);
     try {
       const params = selectedLocation ? { locationId: selectedLocation } : {};
       const response = await inventoryAPI.getAll(params);
-      setInventoryData(response.data);
+      const data = Array.isArray(response.data) ? response.data : response.data?.inventory || [];
+      setInventoryData(data);
     } catch (error) {
       console.error('Failed to load inventory:', error);
-      // Fallback to local data
-      if (materials) {
-        setInventoryData(
-          materials.map((m) => ({
-            materialId: m.id,
-            materialName: m.name,
-            category: m.category,
-            unit: m.unit,
-            currentStock: m.currentStock,
-            minStockLevel: m.minStockLevel,
-          }))
-        );
-      }
     } finally {
       setLoading(false);
     }
   };
 
   const getTotalStock = () => {
-    return inventoryData.reduce((sum, item) => sum + (item.currentStock || 0), 0);
+    return inventoryData.reduce((sum, item) => sum + (parseFloat(item.quantity_kg) || 0), 0);
   };
 
   const getLowStockCount = () => {
     return inventoryData.filter(
-      (item) => item.minStockLevel && item.currentStock < item.minStockLevel
+      (item) => parseFloat(item.quantity_kg) === 0
     ).length;
   };
 
   const getStockValue = () => {
-    // Simplified calculation - would need pricing data for accuracy
-    return inventoryData.reduce((sum, item) => sum + (item.currentStock || 0) * 0.5, 0);
+    return inventoryData.reduce((sum, item) => sum + (parseFloat(item.estimated_value) || 0), 0);
   };
 
   const getMaterialCategories = () => {
     const categories: { [key: string]: number } = {};
     inventoryData.forEach((item) => {
-      const category = item.category || 'uncategorized';
-      categories[category] = (categories[category] || 0) + (item.currentStock || 0);
+      const category = item.material_category || 'uncategorized';
+      categories[category] = (categories[category] || 0) + (parseFloat(item.quantity_kg) || 0);
     });
     return categories;
   };
@@ -100,7 +97,7 @@ export default function Inventory() {
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Low Stock Items</p>
+              <p className="text-sm text-gray-600">Zero Stock Items</p>
               <p className="text-2xl font-bold text-red-600">
                 {loading ? '...' : getLowStockCount()}
               </p>
@@ -153,13 +150,13 @@ export default function Inventory() {
             </label>
             <select
               value={selectedLocation || ''}
-              onChange={(e) => setSelectedLocation(e.target.value ? parseInt(e.target.value) : null)}
+              onChange={(e) => setSelectedLocation(e.target.value || null)}
               className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
             >
               <option value="">All Locations</option>
-              {locations?.map((location) => (
+              {locations.map((location) => (
                 <option key={location.id} value={location.id}>
-                  {location.name} ({location.type})
+                  {location.name}
                 </option>
               ))}
             </select>
@@ -193,13 +190,13 @@ export default function Inventory() {
                   Material
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Current Stock
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Min Level
+                  Sale Price/kg
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Estimated Value
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -223,48 +220,41 @@ export default function Inventory() {
                   </td>
                 </tr>
               ) : (
-                inventoryData.map((item) => {
-                  const isLowStock = item.minStockLevel && item.currentStock < item.minStockLevel;
-                  const stockPercentage = item.minStockLevel
-                    ? (item.currentStock / item.minStockLevel) * 100
-                    : 100;
+                inventoryData.map((item, index) => {
+                  const qty = parseFloat(item.quantity_kg) || 0;
+                  const isLowStock = qty === 0;
 
                   return (
-                    <tr key={`${item.materialId}-${item.locationId || 'all'}`} className="hover:bg-gray-50">
+                    <tr key={`${item.material_category_id}-${item.location_id || index}`} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        {item.materialName}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 capitalize">
-                        {item.category}
+                        {item.material_category}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold">{item.currentStock.toFixed(2)}</span>
-                          <span className="text-gray-500">{item.unit}</span>
+                          <span className="font-semibold">{qty.toFixed(2)}</span>
+                          <span className="text-gray-500">kg</span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        {item.minStockLevel ? `${item.minStockLevel.toFixed(2)} ${item.unit}` : '-'}
+                        {item.current_sale_price ? `$${parseFloat(item.current_sale_price).toFixed(2)}` : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        ${(parseFloat(item.estimated_value) || 0).toFixed(2)}
                       </td>
                       <td className="px-4 py-3">
                         {isLowStock ? (
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                              <AlertTriangle className="w-3 h-3 mr-1" />
-                              Low Stock
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {stockPercentage.toFixed(0)}%
-                            </span>
-                          </div>
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            No Stock
+                          </span>
                         ) : (
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                            Good
+                            In Stock
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        {item.locationName || 'All Locations'}
+                        {item.location_name || 'All Locations'}
                       </td>
                     </tr>
                   );

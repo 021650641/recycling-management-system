@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { materialsAPI, locationsAPI, pricesAPI } from '@/lib/api';
-import { db } from '@/lib/db';
+import { materialsAPI, locationsAPI } from '@/lib/api';
+import { api } from '@/lib/api';
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -24,16 +24,26 @@ export default function AdminPanel() {
     try {
       if (activeTab === 'materials') {
         const response = await materialsAPI.getAll();
-        setMaterials(response.data);
-        await db.materials.bulkPut(response.data);
+        const data = Array.isArray(response.data) ? response.data : response.data?.materials || [];
+        setMaterials(data);
       } else if (activeTab === 'locations') {
         const response = await locationsAPI.getAll();
-        setLocations(response.data);
-        await db.locations.bulkPut(response.data);
+        const data = Array.isArray(response.data) ? response.data : response.data?.locations || [];
+        setLocations(data);
       } else if (activeTab === 'pricing') {
-        const response = await pricesAPI.getAll();
-        setPrices(response.data);
-        await db.dailyPrices.bulkPut(response.data);
+        // Load materials for the pricing form dropdown
+        const matResponse = await materialsAPI.getAll();
+        const matData = Array.isArray(matResponse.data) ? matResponse.data : matResponse.data?.materials || [];
+        setMaterials(matData);
+
+        const locResponse = await locationsAPI.getAll();
+        const locData = Array.isArray(locResponse.data) ? locResponse.data : locResponse.data?.locations || [];
+        setLocations(locData);
+
+        // Prices are at /materials/prices, not /prices
+        const priceResponse = await api.get('/materials/prices');
+        const priceData = Array.isArray(priceResponse.data) ? priceResponse.data : priceResponse.data?.prices || [];
+        setPrices(priceData);
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -62,13 +72,9 @@ export default function AdminPanel() {
           toast.success('Location created');
         }
       } else if (activeTab === 'pricing') {
-        if (editingItem) {
-          await pricesAPI.update(editingItem.id, data);
-          toast.success('Price updated');
-        } else {
-          await pricesAPI.create(data);
-          toast.success('Price created');
-        }
+        // Prices endpoint is at /materials/prices
+        await api.post('/materials/prices', data);
+        toast.success(editingItem ? 'Price updated' : 'Price created');
       }
       setShowForm(false);
       setEditingItem(null);
@@ -78,19 +84,16 @@ export default function AdminPanel() {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: number | string) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
 
     try {
       if (activeTab === 'materials') {
-        await materialsAPI.delete(id);
+        await materialsAPI.delete(id as number);
         toast.success('Material deleted');
       } else if (activeTab === 'locations') {
-        await locationsAPI.delete(id);
+        await locationsAPI.delete(id as number);
         toast.success('Location deleted');
-      } else if (activeTab === 'pricing') {
-        await pricesAPI.update(id, { isActive: false });
-        toast.success('Price deactivated');
       }
       loadData();
     } catch (error: any) {
@@ -121,10 +124,8 @@ export default function AdminPanel() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Stock</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Min Level</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
@@ -133,13 +134,11 @@ export default function AdminPanel() {
             {materials.map((material) => (
               <tr key={material.id}>
                 <td className="px-4 py-3 text-sm text-gray-900">{material.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-900 capitalize">{material.category}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">{material.description || '-'}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{material.unit}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{material.currentStock?.toFixed(2) || 0}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{material.minStockLevel || '-'}</td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-1 text-xs rounded-full ${material.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {material.isActive ? 'Active' : 'Inactive'}
+                  <span className={`px-2 py-1 text-xs rounded-full ${material.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {material.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -183,8 +182,8 @@ export default function AdminPanel() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Manager</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
@@ -193,11 +192,11 @@ export default function AdminPanel() {
             {locations.map((location) => (
               <tr key={location.id}>
                 <td className="px-4 py-3 text-sm text-gray-900">{location.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-900 capitalize">{location.type}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{location.address || '-'}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">{location.manager_name || '-'}</td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-1 text-xs rounded-full ${location.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {location.isActive ? 'Active' : 'Inactive'}
+                  <span className={`px-2 py-1 text-xs rounded-full ${location.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {location.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -242,30 +241,27 @@ export default function AdminPanel() {
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchase Price</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sale Price</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Effective Date</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchase Price/kg</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sale Price/kg</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {prices.map((price) => (
-              <tr key={price.id}>
-                <td className="px-4 py-3 text-sm text-gray-900">{materials.find(m => m.id === price.materialId)?.name || 'Unknown'}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{price.locationId ? locations.find(l => l.id === price.locationId)?.name : 'All'}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">${price.purchasePrice.toFixed(2)}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">${price.salePrice.toFixed(2)}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{price.effectiveDate}</td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-2">
-                    <button onClick={() => { setEditingItem(price); setShowForm(true); }} className="text-blue-600 hover:text-blue-800">
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDelete(price.id)} className="text-red-600 hover:text-red-800">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+            {prices.map((price, index) => (
+              <tr key={price.id || index}>
+                <td className="px-4 py-3 text-sm text-gray-900">
+                  {price.material_name || materials.find(m => m.id === price.material_category_id)?.name || 'Unknown'}
                 </td>
+                <td className="px-4 py-3 text-sm text-gray-900">
+                  {price.location_id ? locations.find(l => l.id === price.location_id)?.name || '-' : 'All'}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900">
+                  ${parseFloat(price.purchase_price_per_kg || 0).toFixed(2)}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900">
+                  ${parseFloat(price.sale_price_per_kg || 0).toFixed(2)}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900">{price.date || '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -332,10 +328,9 @@ export default function AdminPanel() {
 function MaterialForm({ item, onSave, onCancel }: any) {
   const [formData, setFormData] = useState({
     name: item?.name || '',
-    category: item?.category || '',
+    description: item?.description || '',
     unit: item?.unit || 'kg',
-    minStockLevel: item?.minStockLevel || '',
-    isActive: item?.isActive ?? true,
+    isActive: item?.is_active ?? true,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -357,13 +352,12 @@ function MaterialForm({ item, onSave, onCancel }: any) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Category *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
           <input
             type="text"
-            value={formData.category}
-            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-            required
           />
         </div>
         <div>
@@ -377,16 +371,6 @@ function MaterialForm({ item, onSave, onCancel }: any) {
             <option value="ton">ton</option>
             <option value="unit">unit</option>
           </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Min Stock Level</label>
-          <input
-            type="number"
-            step="0.01"
-            value={formData.minStockLevel}
-            onChange={(e) => setFormData({ ...formData, minStockLevel: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-          />
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -415,9 +399,10 @@ function MaterialForm({ item, onSave, onCancel }: any) {
 function LocationForm({ item, onSave, onCancel }: any) {
   const [formData, setFormData] = useState({
     name: item?.name || '',
-    type: item?.type || 'warehouse',
     address: item?.address || '',
-    isActive: item?.isActive ?? true,
+    managerName: item?.manager_name || '',
+    phone: item?.phone || '',
+    isActive: item?.is_active ?? true,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -439,24 +424,31 @@ function LocationForm({ item, onSave, onCancel }: any) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Type *</label>
-          <select
-            value={formData.type}
-            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+          <label className="block text-sm font-medium text-gray-700 mb-2">Manager Name</label>
+          <input
+            type="text"
+            value={formData.managerName}
+            onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-          >
-            <option value="warehouse">Warehouse</option>
-            <option value="yard">Yard</option>
-            <option value="processing">Processing</option>
-          </select>
+          />
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Address *</label>
         <input
           type="text"
           value={formData.address}
           onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+          required
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+        <input
+          type="text"
+          value={formData.phone}
+          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
         />
       </div>
@@ -485,21 +477,21 @@ function LocationForm({ item, onSave, onCancel }: any) {
 
 function PriceForm({ item, materials, locations, onSave, onCancel }: any) {
   const [formData, setFormData] = useState({
-    materialId: item?.materialId || '',
-    locationId: item?.locationId || '',
-    purchasePrice: item?.purchasePrice || '',
-    salePrice: item?.salePrice || '',
-    effectiveDate: item?.effectiveDate || new Date().toISOString().split('T')[0],
+    materialCategoryId: item?.material_category_id || '',
+    locationId: item?.location_id || '',
+    purchasePricePerKg: item?.purchase_price_per_kg || '',
+    salePricePerKg: item?.sale_price_per_kg || '',
+    date: item?.date || new Date().toISOString().split('T')[0],
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
-      ...formData,
-      materialId: parseInt(formData.materialId),
-      locationId: formData.locationId ? parseInt(formData.locationId) : null,
-      purchasePrice: parseFloat(formData.purchasePrice),
-      salePrice: parseFloat(formData.salePrice),
+      materialCategoryId: formData.materialCategoryId,
+      locationId: formData.locationId || null,
+      purchasePricePerKg: parseFloat(formData.purchasePricePerKg),
+      salePricePerKg: parseFloat(formData.salePricePerKg),
+      date: formData.date,
     });
   };
 
@@ -509,8 +501,8 @@ function PriceForm({ item, materials, locations, onSave, onCancel }: any) {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Material *</label>
           <select
-            value={formData.materialId}
-            onChange={(e) => setFormData({ ...formData, materialId: e.target.value })}
+            value={formData.materialCategoryId}
+            onChange={(e) => setFormData({ ...formData, materialCategoryId: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             required
           >
@@ -534,33 +526,33 @@ function PriceForm({ item, materials, locations, onSave, onCancel }: any) {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Purchase Price *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Purchase Price/kg *</label>
           <input
             type="number"
             step="0.01"
-            value={formData.purchasePrice}
-            onChange={(e) => setFormData({ ...formData, purchasePrice: e.target.value })}
+            value={formData.purchasePricePerKg}
+            onChange={(e) => setFormData({ ...formData, purchasePricePerKg: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Sale Price *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Sale Price/kg *</label>
           <input
             type="number"
             step="0.01"
-            value={formData.salePrice}
-            onChange={(e) => setFormData({ ...formData, salePrice: e.target.value })}
+            value={formData.salePricePerKg}
+            onChange={(e) => setFormData({ ...formData, salePricePerKg: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Effective Date *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Date *</label>
           <input
             type="date"
-            value={formData.effectiveDate}
-            onChange={(e) => setFormData({ ...formData, effectiveDate: e.target.value })}
+            value={formData.date}
+            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             required
           />
