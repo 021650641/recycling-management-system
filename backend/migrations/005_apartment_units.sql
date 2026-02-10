@@ -25,7 +25,9 @@ CREATE INDEX IF NOT EXISTS idx_apartment_unit_active ON apartment_unit(apartment
 CREATE INDEX IF NOT EXISTS idx_transaction_apartment_unit ON transaction(apartment_unit_id);
 
 -- Update v_transaction_details view to include unit info
-CREATE OR REPLACE VIEW v_transaction_details AS
+-- Must DROP first because PostgreSQL won't allow column renames via CREATE OR REPLACE
+DROP VIEW IF EXISTS v_transaction_details;
+CREATE VIEW v_transaction_details AS
 SELECT
     t.id AS transaction_id,
     t.transaction_number,
