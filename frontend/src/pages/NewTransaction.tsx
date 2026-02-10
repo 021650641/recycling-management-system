@@ -44,7 +44,6 @@ export default function NewTransaction() {
   };
 
   const [formData, setFormData] = useState({
-    sourceType: 'waste_picker' as 'waste_picker' | 'apartment',
     wastePickerId: '',
     apartmentComplexId: '',
     apartmentUnitId: '',
@@ -83,6 +82,7 @@ export default function NewTransaction() {
     } else {
       setUnits([]);
     }
+    setFormData(prev => ({ ...prev, apartmentUnitId: '' }));
   }, [formData.apartmentComplexId]);
 
   useEffect(() => {
@@ -125,31 +125,27 @@ export default function NewTransaction() {
       return;
     }
 
-    if (formData.sourceType === 'waste_picker' && !formData.wastePickerId) {
-      toast.error('Please select a waste picker');
-      return;
-    }
-
-    if (formData.sourceType === 'apartment' && !formData.apartmentComplexId) {
-      toast.error('Please select an apartment complex');
+    if (!formData.wastePickerId) {
+      toast.error('Please select a waste picker (vendor)');
       return;
     }
 
     const transactionData: any = {
-      locationId: parseInt(formData.locationId),
-      materialCategoryId: parseInt(formData.materialId),
-      sourceType: formData.sourceType,
+      locationId: formData.locationId,
+      materialCategoryId: formData.materialId,
+      wastePickerId: formData.wastePickerId,
       weightKg: parseFloat(formData.quantity),
       qualityGrade: formData.qualityGrade,
       paymentMethod: formData.paymentMethod,
       notes: formData.notes || undefined,
     };
 
-    if (formData.sourceType === 'waste_picker') {
-      transactionData.wastePickerId = formData.wastePickerId;
-    } else {
+    // Source is optional - add if provided
+    if (formData.apartmentComplexId) {
       transactionData.apartmentComplexId = formData.apartmentComplexId;
-      transactionData.apartmentUnitId = formData.apartmentUnitId || undefined;
+      if (formData.apartmentUnitId) {
+        transactionData.apartmentUnitId = formData.apartmentUnitId;
+      }
     }
 
     setIsSubmitting(true);
@@ -213,75 +209,47 @@ export default function NewTransaction() {
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-        {/* Source Type */}
+        {/* Waste Picker (Vendor) - Always Required */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Source Type *
+          <label htmlFor="wastePickerId" className="block text-sm font-medium text-gray-700 mb-2">
+            Waste Picker (Vendor) *
           </label>
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              type="button"
-              onClick={() => setFormData(prev => ({ ...prev, sourceType: 'waste_picker', apartmentComplexId: '', apartmentUnitId: '' }))}
-              className={`p-4 border-2 rounded-lg font-medium transition-colors ${
-                formData.sourceType === 'waste_picker'
-                  ? 'border-primary-600 bg-primary-50 text-primary-700'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              Waste Picker
-            </button>
-            <button
-              type="button"
-              onClick={() => setFormData(prev => ({ ...prev, sourceType: 'apartment', wastePickerId: '' }))}
-              className={`p-4 border-2 rounded-lg font-medium transition-colors ${
-                formData.sourceType === 'apartment'
-                  ? 'border-primary-600 bg-primary-50 text-primary-700'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              Apartment / Building
-            </button>
-          </div>
+          <select
+            id="wastePickerId"
+            name="wastePickerId"
+            value={formData.wastePickerId}
+            onChange={handleChange}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+            required
+          >
+            <option value="">Select waste picker</option>
+            {wastePickers.map((wp) => (
+              <option key={wp.id} value={wp.id}>
+                {wp.first_name} {wp.last_name}
+                {wp.id_number ? ` (${wp.id_number})` : ''}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* Source Selection */}
-        {formData.sourceType === 'waste_picker' ? (
-          <div>
-            <label htmlFor="wastePickerId" className="block text-sm font-medium text-gray-700 mb-2">
-              Waste Picker *
-            </label>
-            <select
-              id="wastePickerId"
-              name="wastePickerId"
-              value={formData.wastePickerId}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-              required
-            >
-              <option value="">Select waste picker</option>
-              {wastePickers.map((wp) => (
-                <option key={wp.id} value={wp.id}>
-                  {wp.first_name} {wp.last_name}
-                  {wp.id_number ? ` (${wp.id_number})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
+        {/* Source (Optional) - Where the material came from */}
+        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Source Origin (optional - where did the material come from?)
+          </label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="apartmentComplexId" className="block text-sm font-medium text-gray-700 mb-2">
-                Apartment Complex *
+              <label htmlFor="apartmentComplexId" className="block text-xs text-gray-500 mb-1">
+                Apartment Complex
               </label>
               <select
                 id="apartmentComplexId"
                 name="apartmentComplexId"
                 value={formData.apartmentComplexId}
                 onChange={(e) => setFormData(prev => ({ ...prev, apartmentComplexId: e.target.value, apartmentUnitId: '' }))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none bg-white"
               >
-                <option value="">Select apartment complex</option>
+                <option value="">No source / Unknown</option>
                 {apartments.map((apt) => (
                   <option key={apt.id} value={apt.id}>
                     {apt.name}
@@ -291,18 +259,18 @@ export default function NewTransaction() {
               </select>
             </div>
             <div>
-              <label htmlFor="apartmentUnitId" className="block text-sm font-medium text-gray-700 mb-2">
-                Unit {loadingUnits && '(loading...)'}
+              <label htmlFor="apartmentUnitId" className="block text-xs text-gray-500 mb-1">
+                Specific Unit {loadingUnits && '(loading...)'}
               </label>
               <select
                 id="apartmentUnitId"
                 name="apartmentUnitId"
                 value={formData.apartmentUnitId}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none bg-white"
                 disabled={!formData.apartmentComplexId || loadingUnits}
               >
-                <option value="">Select unit (optional)</option>
+                <option value="">Any / Unknown unit</option>
                 {units.filter(u => u.is_active).map((unit) => (
                   <option key={unit.id} value={unit.id}>
                     Unit {unit.unit_number}
@@ -312,7 +280,7 @@ export default function NewTransaction() {
               </select>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Material & Location */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

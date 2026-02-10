@@ -13,9 +13,7 @@ router.post('/', authorize('admin', 'manager', 'operator'), async (req: any, res
     const {
       locationId,
       materialCategoryId,
-      sourceType,
       apartmentComplexId,
-      apartmentUnit,
       apartmentUnitId,
       wastePickerId,
       weightKg,
@@ -25,29 +23,29 @@ router.post('/', authorize('admin', 'manager', 'operator'), async (req: any, res
       deviceId,
     } = req.body;
 
-    // Validation
-    if (!locationId || !materialCategoryId || !sourceType || !weightKg) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    // Validation - waste picker is always required (they are the seller)
+    if (!locationId || !materialCategoryId || !weightKg || !wastePickerId) {
+      return res.status(400).json({ error: 'Missing required fields: location, material, weight, and waste picker are required' });
     }
 
-    if (sourceType === 'apartment' && !apartmentComplexId) {
-      return res.status(400).json({ error: 'Apartment complex ID required for apartment source' });
-    }
+    // Auto-derive source_type: if apartment info provided, it's 'apartment', otherwise 'waste_picker'
+    const sourceType = apartmentComplexId ? 'apartment' : 'waste_picker';
 
-    if (sourceType === 'waste_picker' && !wastePickerId) {
-      return res.status(400).json({ error: 'Waste picker ID required for waste picker source' });
-    }
-
-    // Get current price
+    // Get current price from daily_price table
     const priceResult = await query(
-      'SELECT get_current_price($1, $2, CURRENT_DATE, $3) as price',
-      [materialCategoryId, locationId, 'purchase']
+      `SELECT purchase_price_per_kg FROM daily_price
+       WHERE material_category_id = $1
+         AND (location_id = $2 OR location_id IS NULL)
+         AND date <= CURRENT_DATE
+       ORDER BY date DESC, location_id DESC NULLS LAST
+       LIMIT 1`,
+      [materialCategoryId, locationId]
     );
 
-    const unitPrice = priceResult.rows[0]?.price;
+    const unitPrice = priceResult.rows[0]?.purchase_price_per_kg;
 
     if (!unitPrice) {
-      return res.status(400).json({ error: 'No price configured for this material' });
+      return res.status(400).json({ error: 'No price configured for this material. Please set a daily price first.' });
     }
 
     const totalCost = (parseFloat(weightKg) * parseFloat(unitPrice)).toFixed(2);
@@ -56,16 +54,16 @@ router.post('/', authorize('admin', 'manager', 'operator'), async (req: any, res
     const result = await query(
       `INSERT INTO transaction (
         location_id, material_category_id, source_type,
-        apartment_complex_id, apartment_unit, apartment_unit_id, waste_picker_id,
+        apartment_complex_id, apartment_unit_id, waste_picker_id,
         weight_kg, quality_grade, unit_price, total_cost,
         payment_method, notes, recorded_by, device_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *`,
       [
         locationId, materialCategoryId, sourceType,
-        apartmentComplexId, apartmentUnit, apartmentUnitId || null, wastePickerId,
+        apartmentComplexId || null, apartmentUnitId || null, wastePickerId,
         weightKg, qualityGrade || 'standard', unitPrice, totalCost,
-        paymentMethod, notes, req.user.id, deviceId
+        paymentMethod || 'cash', notes || null, req.user.id, deviceId || null
       ]
     );
 
