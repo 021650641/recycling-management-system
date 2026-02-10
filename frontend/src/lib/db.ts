@@ -85,6 +85,14 @@ class RecyclingDatabase extends Dexie {
       syncQueue: '++id, createdAt, retryCount',
       users: 'id, username, role'
     });
+    this.version(3).stores({
+      transactions: '++id, transactionId, type, materialId, createdAt, synced, localId',
+      materials: 'id, name, category, currentStock, isActive',
+      locations: 'id, name, type, isActive',
+      dailyPrices: 'id, materialId, locationId, effectiveDate',
+      syncQueue: '++id, createdAt, retryCount',
+      users: 'id, username, role'
+    });
   }
 }
 

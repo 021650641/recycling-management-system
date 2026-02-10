@@ -6,6 +6,9 @@ class SyncService {
   private isSyncing = false;
 
   async initialize() {
+    // Run an immediate sync on startup
+    this.sync();
+
     // Start periodic sync every 2 minutes
     this.syncInterval = setInterval(() => {
       this.sync();

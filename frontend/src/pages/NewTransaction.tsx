@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { transactionsAPI, pricesAPI, materialsAPI, locationsAPI } from '@/lib/api';
 import { db } from '@/lib/db';
-import { transactionsAPI, pricesAPI } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
 import { Save, ArrowLeft } from 'lucide-react';
@@ -12,9 +11,27 @@ export default function NewTransaction() {
   const { user } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
 
-  const materials = useLiveQuery(() => db.materials.where('isActive').equals(1).toArray(), []);
-  const locations = useLiveQuery(() => db.locations.where('isActive').equals(1).toArray(), []);
+  useEffect(() => {
+    loadFormData();
+  }, []);
+
+  const loadFormData = async () => {
+    try {
+      const [matRes, locRes] = await Promise.all([
+        materialsAPI.getAll(),
+        locationsAPI.getAll(),
+      ]);
+      const matData = Array.isArray(matRes.data) ? matRes.data : matRes.data?.materials || [];
+      const locData = Array.isArray(locRes.data) ? locRes.data : locRes.data?.locations || [];
+      setMaterials(matData.filter((m: any) => m.is_active !== false));
+      setLocations(locData.filter((l: any) => l.is_active !== false));
+    } catch (error) {
+      console.error('Failed to load form data:', error);
+    }
+  };
 
   const [formData, setFormData] = useState({
     type: 'purchase' as 'purchase' | 'sale',
