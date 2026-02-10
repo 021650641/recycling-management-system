@@ -244,8 +244,8 @@ function SaleForm({
     e.preventDefault();
     onSave({
       clientId: formData.clientId,
-      locationId: parseInt(formData.locationId),
-      materialCategoryId: parseInt(formData.materialCategoryId),
+      locationId: formData.locationId,
+      materialCategoryId: formData.materialCategoryId,
       weightKg: parseFloat(formData.weightKg),
       unitPrice: parseFloat(formData.unitPrice) || undefined,
       paymentMethod: formData.paymentMethod,

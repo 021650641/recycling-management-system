@@ -80,12 +80,17 @@ router.post('/', authorize('admin', 'manager', 'operator'), async (req: any, res
     let saleUnitPrice = unitPrice;
     if (!saleUnitPrice) {
       const priceResult = await query(
-        'SELECT get_current_price($1, $2, CURRENT_DATE, $3) as price',
-        [materialCategoryId, locationId, 'sale']
+        `SELECT sale_price_per_kg FROM daily_price
+         WHERE material_category_id = $1
+           AND (location_id = $2 OR location_id IS NULL)
+           AND date <= CURRENT_DATE
+         ORDER BY date DESC, location_id DESC NULLS LAST
+         LIMIT 1`,
+        [materialCategoryId, locationId]
       );
-      saleUnitPrice = priceResult.rows[0]?.price;
+      saleUnitPrice = priceResult.rows[0]?.sale_price_per_kg;
       if (!saleUnitPrice) {
-        return res.status(400).json({ error: 'No sale price configured for this material' });
+        return res.status(400).json({ error: 'No sale price configured for this material. Please set a daily price first.' });
       }
     }
 
