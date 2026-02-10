@@ -164,7 +164,7 @@ router.get('/pull', async (req: any, res, next) => {
         [sinceDate]
       ),
       query(
-        'SELECT * FROM daily_price WHERE updated_at > $1 ORDER BY effective_date DESC',
+        'SELECT * FROM daily_price WHERE COALESCE(updated_at, created_at) > $1 ORDER BY date DESC',
         [sinceDate]
       ),
       query(

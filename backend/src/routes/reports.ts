@@ -280,50 +280,47 @@ router.get('/traceability', async (req, res, next) => {
 // Get summary statistics
 router.get('/summary', async (req, res, next) => {
   try {
-    const { locationId } = req.query;
+    const { locationId, startDate, endDate } = req.query;
 
     // Get total materials collected
     let materialsQuery = `
-      SELECT COALESCE(SUM(quantity_kg), 0) as total_kg
-      FROM transactions
+      SELECT COALESCE(SUM(weight_kg), 0) as total_kg
+      FROM transaction
       WHERE 1=1
     `;
     const materialsParams: any[] = [];
+    let mParamCount = 1;
 
     if (locationId) {
       materialsParams.push(locationId);
-      materialsQuery += ' AND location_id = $1';
+      materialsQuery += ` AND location_id = $${mParamCount++}`;
+    }
+    if (startDate) {
+      materialsParams.push(startDate);
+      materialsQuery += ` AND transaction_date >= $${mParamCount++}`;
+    }
+    if (endDate) {
+      materialsParams.push(endDate);
+      materialsQuery += ` AND transaction_date <= $${mParamCount++}`;
     }
 
     const materialsResult = await query(materialsQuery, materialsParams);
 
     // Get active locations count
-    let locationsQuery = `
-      SELECT COUNT(DISTINCT id) as count
-      FROM locations
-      WHERE active = true
-    `;
-    const locationsParams: any[] = [];
-
-    if (locationId) {
-      locationsParams.push(locationId);
-      locationsQuery += ' AND id = $1';
-    }
-
-    const locationsResult = await query(locationsQuery, locationsParams);
+    const locationsResult = await query(
+      'SELECT COUNT(*) as count FROM location WHERE is_active = true'
+    );
 
     // Get active waste pickers count
-    const pickersResult = await query(`
-      SELECT COUNT(DISTINCT id) as count
-      FROM users
-      WHERE role = 'waste_picker' AND active = true
-    `);
+    const pickersResult = await query(
+      'SELECT COUNT(*) as count FROM waste_picker WHERE is_active = true'
+    );
 
     // Get pending payments total
     let paymentsQuery = `
-      SELECT COALESCE(SUM(amount_due), 0) as total
-      FROM v_pending_payments
-      WHERE 1=1
+      SELECT COALESCE(SUM(total_cost - COALESCE(paid_amount, 0)), 0) as total
+      FROM transaction
+      WHERE payment_status IN ('pending', 'partial')
     `;
     const paymentsParams: any[] = [];
 
