@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../db';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import type { StringValue } from 'ms';
 import { config } from '../config';
 import { authenticate } from '../middleware/auth';
 
@@ -45,7 +46,7 @@ router.post('/login', async (req, res, next): Promise<any> => {
         locationId: user.location_id,
       },
       config.jwt.secret,
-      { expiresIn: config.jwt.expiresIn }
+      { expiresIn: config.jwt.expiresIn as StringValue }
     );
 
     // Update last login

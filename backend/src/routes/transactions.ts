@@ -170,9 +170,10 @@ router.patch('/:id/payment', authorize('admin', 'manager'), async (req, res, nex
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
-    res.json(result.rows[0]);
+    return res.json(result.rows[0]);
   } catch (error) {
     next(error);
+    return;
   }
 });
 

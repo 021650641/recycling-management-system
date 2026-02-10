@@ -47,7 +47,7 @@ router.get('/weekly-apartment', async (req, res, next) => {
     const { weeks = 4 } = req.query;
 
     const result = await query(
-      `SELECT * FROM mv_weekly_apartment_summary 
+      `SELECT * FROM mv_weekly_apartment_summary
        WHERE week_start >= CURRENT_DATE - INTERVAL '${weeks} weeks'
        ORDER BY week_start DESC, apartment_name, material_category`
     );
@@ -64,7 +64,7 @@ router.get('/waste-picker-monthly', async (req, res, next) => {
     const { months = 3 } = req.query;
 
     const result = await query(
-      `SELECT * FROM mv_waste_picker_monthly_summary 
+      `SELECT * FROM mv_waste_picker_monthly_summary
        WHERE month_start >= CURRENT_DATE - INTERVAL '${months} months'
        ORDER BY month_start DESC, waste_picker_name, material_category`
     );
@@ -80,7 +80,7 @@ router.get('/location-daily', async (req, res, next) => {
   try {
     const { locationId, days = 30 } = req.query;
 
-    let queryText = `SELECT * FROM mv_location_daily_summary 
+    let queryText = `SELECT * FROM mv_location_daily_summary
                      WHERE transaction_date >= CURRENT_DATE - INTERVAL '${days} days'`;
     const params: any[] = [];
 
@@ -117,6 +117,58 @@ router.get('/pending-payments', authorize('admin', 'manager'), async (req, res, 
     const result = await query(queryText, params);
 
     res.json({ payments: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get dashboard summary
+router.get('/summary', async (req: any, res, next) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    // Get total transactions
+    const transactionsResult = await query(
+      `SELECT COUNT(*) as count, 
+              COALESCE(SUM(total_cost), 0) as total_value
+       FROM transaction 
+       WHERE transaction_date BETWEEN $1 AND $2`,
+      [startDate, endDate]
+    );
+
+    // Get total weight by type
+    const weightResult = await query(
+      `SELECT 
+        SUM(CASE WHEN source_type = 'apartment' THEN weight_kg ELSE 0 END) as apartment_weight,
+        SUM(CASE WHEN source_type = 'waste_picker' THEN weight_kg ELSE 0 END) as waste_picker_weight
+       FROM transaction 
+       WHERE transaction_date BETWEEN $1 AND $2`,
+      [startDate, endDate]
+    );
+
+    // Get material breakdown
+    const materialsResult = await query(
+      `SELECT mc.name as material, 
+              COALESCE(SUM(t.weight_kg), 0) as weight
+       FROM material_category mc
+       LEFT JOIN transaction t ON mc.id = t.material_category_id 
+         AND t.transaction_date BETWEEN $1 AND $2
+       GROUP BY mc.name
+       ORDER BY weight DESC`,
+      [startDate, endDate]
+    );
+
+    res.json({
+      transactions: {
+        count: parseInt(transactionsResult.rows[0].count),
+        totalValue: parseFloat(transactionsResult.rows[0].total_value)
+      },
+      weight: {
+        apartments: parseFloat(weightResult.rows[0].apartment_weight || 0),
+        wastePickers: parseFloat(weightResult.rows[0].waste_picker_weight || 0)
+      },
+      materials: materialsResult.rows
+    });
   } catch (error) {
     next(error);
   }

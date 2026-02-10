@@ -31,10 +31,10 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       error: null,
 
-      login: async (username: string, password: string) => {
+      login: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await authAPI.login(username, password);
+          const response = await authAPI.login(email, password);
           const { token, user } = response.data;
           
           localStorage.setItem('auth_token', token);

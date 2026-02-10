@@ -77,9 +77,9 @@ class RecyclingDatabase extends Dexie {
 
   constructor() {
     super('recyclingDB');
-    this.version(1).stores({
+    this.version(2).stores({
       transactions: '++id, transactionId, type, materialId, createdAt, synced, localId',
-      materials: 'id, name, category',
+      materials: 'id, name, category, currentStock',
       locations: 'id, name, type',
       dailyPrices: 'id, materialId, locationId, effectiveDate',
       syncQueue: '++id, createdAt, retryCount',
