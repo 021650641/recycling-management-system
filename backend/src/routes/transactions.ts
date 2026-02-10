@@ -50,17 +50,20 @@ router.post('/', authorize('admin', 'manager', 'operator'), async (req: any, res
 
     const totalCost = (parseFloat(weightKg) * parseFloat(unitPrice)).toFixed(2);
 
+    // Generate transaction number
+    const transactionNumber = `TX-${Date.now().toString(36).toUpperCase()}`;
+
     // Insert transaction
     const result = await query(
       `INSERT INTO transaction (
-        location_id, material_category_id, source_type,
+        transaction_number, location_id, material_category_id, source_type,
         apartment_complex_id, apartment_unit_id, waste_picker_id,
         weight_kg, quality_grade, unit_price, total_cost,
         payment_method, notes, recorded_by, device_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *`,
       [
-        locationId, materialCategoryId, sourceType,
+        transactionNumber, locationId, materialCategoryId, sourceType,
         apartmentComplexId || null, apartmentUnitId || null, wastePickerId,
         weightKg, qualityGrade || 'standard', unitPrice, totalCost,
         paymentMethod || 'cash', notes || null, req.user.id, deviceId || null
@@ -155,14 +158,19 @@ router.get('/:id', async (req, res, next): Promise<any> => {
 // Update payment status
 router.patch('/:id/payment', authorize('admin', 'manager'), async (req, res, next) => {
   try {
-    const { paymentStatus, paymentDate, paymentReference } = req.body;
+    const { paymentStatus, paidAmount, paymentMethod, paymentReference } = req.body;
 
     const result = await query(
-      `UPDATE transaction 
-       SET payment_status = $1, payment_date = $2, payment_reference = $3, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4
+      `UPDATE transaction
+       SET payment_status = COALESCE($1, payment_status),
+           paid_amount = COALESCE($2, paid_amount),
+           payment_method = COALESCE($3, payment_method),
+           payment_reference = COALESCE($4, payment_reference),
+           paid_at = CASE WHEN $1 = 'paid' THEN CURRENT_TIMESTAMP ELSE paid_at END,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5
        RETURNING *`,
-      [paymentStatus, paymentDate, paymentReference, req.params.id]
+      [paymentStatus, paidAmount, paymentMethod, paymentReference, req.params.id]
     );
 
     if (result.rows.length === 0) {
