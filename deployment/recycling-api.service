@@ -26,9 +26,8 @@ TimeoutStopSec=10
 
 # Security hardening
 NoNewPrivileges=true
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/var/www/recycling/backend/uploads /var/www/recycling/backend/logs
 PrivateTmp=true
 
 # Resource limits
