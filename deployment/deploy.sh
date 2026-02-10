@@ -205,15 +205,10 @@ SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 sudo mkdir -p $INSTALL_DIR
 sudo chown -R $USER:$USER $INSTALL_DIR
 
-if [ "$IS_UPGRADE" = true ]; then
-    log_info "Pulling latest code..."
-    cd $INSTALL_DIR
-    git fetch origin
-    git reset --hard origin/main
-    git pull origin main
-elif [ "$SOURCE_DIR" != "$INSTALL_DIR" ]; then
+if [ "$SOURCE_DIR" != "$INSTALL_DIR" ]; then
     log_info "Copying repository to installation directory..."
-    cp -a "$SOURCE_DIR/." "$INSTALL_DIR/"
+    # Use rsync to copy files, excluding node_modules and dist to save time
+    rsync -a --exclude='node_modules' --exclude='dist' --exclude='.env' "$SOURCE_DIR/" "$INSTALL_DIR/"
     cd $INSTALL_DIR
 else
     log_info "Already running from installation directory"
