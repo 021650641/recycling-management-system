@@ -17,15 +17,24 @@ router.get('/', async (_req, res, next) => {
 router.get('/prices', async (req, res, next) => {
   try {
     const { date, locationId } = req.query;
-    let queryText = 'SELECT dp.*, mc.name as material_name FROM daily_price dp JOIN material_category mc ON dp.material_category_id = mc.id WHERE date = $1';
-    const params: any[] = [date || new Date().toISOString().split('T')[0]];
+    const asOfDate = date || new Date().toISOString().split('T')[0];
+
+    // Get the most recent price for each material on or before the given date
+    let queryText = `
+      SELECT DISTINCT ON (dp.material_category_id)
+        dp.*, mc.name as material_name
+      FROM daily_price dp
+      JOIN material_category mc ON dp.material_category_id = mc.id
+      WHERE dp.date <= $1
+    `;
+    const params: any[] = [asOfDate];
 
     if (locationId) {
       params.push(locationId);
-      queryText += ' AND (location_id = $2 OR location_id IS NULL)';
-    } else {
-      queryText += ' AND location_id IS NULL';
+      queryText += ` AND (dp.location_id = $2 OR dp.location_id IS NULL)`;
     }
+
+    queryText += ` ORDER BY dp.material_category_id, dp.date DESC, dp.location_id DESC NULLS LAST`;
 
     const result = await query(queryText, params);
     res.json({ prices: result.rows });

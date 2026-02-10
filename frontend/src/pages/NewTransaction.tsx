@@ -89,13 +89,13 @@ export default function NewTransaction() {
     if (formData.materialId && isOnline) {
       fetchCurrentPrice();
     }
-  }, [formData.materialId, isOnline]);
+  }, [formData.materialId, formData.locationId, isOnline]);
 
   const fetchCurrentPrice = async () => {
     try {
-      const response = await api.get('/materials/prices', {
-        params: { date: new Date().toISOString().split('T')[0] }
-      });
+      const params: any = { date: new Date().toISOString().split('T')[0] };
+      if (formData.locationId) params.locationId = formData.locationId;
+      const response = await api.get('/materials/prices', { params });
       const prices = Array.isArray(response.data) ? response.data : response.data?.prices || [];
       const materialPrice = prices.find((p: any) => String(p.material_category_id) === String(formData.materialId));
       if (materialPrice && materialPrice.purchase_price_per_kg) {
