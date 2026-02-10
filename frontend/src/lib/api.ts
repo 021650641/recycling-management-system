@@ -93,7 +93,12 @@ export const reportsAPI = {
   getSummary: (params?: any) => api.get('/reports/summary', { params }),
   getTrends: (params?: any) => api.get('/reports/trends', { params }),
   getPendingPayments: (params?: any) => api.get('/reports/pending-payments', { params }),
+  getPurchases: (params?: any) => api.get('/reports/purchases', { params }),
+  getSales: (params?: any) => api.get('/reports/sales', { params }),
+  getTraceability: (params?: any) => api.get('/reports/traceability', { params }),
   export: (params?: any) => api.get('/reports/export', { params, responseType: 'blob' }),
+  emailReport: (data: any) => api.post('/reports/email', data),
+  getEmailStatus: () => api.get('/reports/email-status'),
 };
 
 // Sync API

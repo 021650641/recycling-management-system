@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { syncService } from '@/lib/syncService';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -21,6 +22,7 @@ import {
   Home,
   ShoppingCart,
   GitBranch,
+  Globe,
 } from 'lucide-react';
 import { useEffect } from 'react';
 import toast from 'react-hot-toast';
@@ -32,17 +34,18 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+  const { t, i18n } = useTranslation();
 
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      toast.success('Back online - syncing data...');
+      toast.success(t('common.online'));
       syncService.sync();
     };
 
     const handleOffline = () => {
       setIsOnline(false);
-      toast.error('You are offline - changes will sync when reconnected');
+      toast.error(t('common.offline'));
     };
 
     window.addEventListener('online', handleOnline);
@@ -52,7 +55,7 @@ export default function Layout() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [t]);
 
   const handleLogout = () => {
     logout();
@@ -61,39 +64,44 @@ export default function Layout() {
 
   const handleManualSync = async () => {
     if (!isOnline) {
-      toast.error('Cannot sync while offline');
+      toast.error(t('common.offline'));
       return;
     }
 
     setIsSyncing(true);
     try {
       await syncService.sync();
-      toast.success('Sync completed successfully');
+      toast.success(t('common.success'));
     } catch (error) {
-      toast.error('Sync failed');
+      toast.error(t('common.error'));
     } finally {
       setIsSyncing(false);
     }
   };
 
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'es' ? 'en' : 'es';
+    i18n.changeLanguage(newLang);
+  };
+
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
-    { path: '/inventory', label: 'Inventory', icon: Package },
-    { path: '/reports', label: 'Reports', icon: BarChart3 },
+    { path: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+    { path: '/transactions', label: t('nav.transactions'), icon: ArrowLeftRight },
+    { path: '/inventory', label: t('nav.inventory'), icon: Package },
+    { path: '/reports', label: t('nav.reports'), icon: BarChart3 },
   ];
 
   const crmItems = [
-    { path: '/vendors', label: 'Vendors', icon: UserCheck, roles: ['admin', 'manager', 'operator'] },
-    { path: '/clients', label: 'Clients', icon: Building2, roles: ['admin', 'manager', 'operator'] },
-    { path: '/sources', label: 'Sources', icon: Home, roles: ['admin', 'manager', 'operator'] },
-    { path: '/sales', label: 'Sales', icon: ShoppingCart, roles: ['admin', 'manager', 'operator'] },
-    { path: '/traceability', label: 'Traceability', icon: GitBranch, roles: ['admin', 'manager'] },
+    { path: '/vendors', label: t('nav.vendors'), icon: UserCheck, roles: ['admin', 'manager', 'operator'] },
+    { path: '/clients', label: t('nav.clients'), icon: Building2, roles: ['admin', 'manager', 'operator'] },
+    { path: '/sources', label: t('nav.sources'), icon: Home, roles: ['admin', 'manager', 'operator'] },
+    { path: '/sales', label: t('nav.sales'), icon: ShoppingCart, roles: ['admin', 'manager', 'operator'] },
+    { path: '/traceability', label: t('nav.traceability'), icon: GitBranch, roles: ['admin', 'manager'] },
   ];
 
   const adminItems = [
-    { path: '/admin', label: 'Admin Panel', icon: Settings, roles: ['admin', 'manager'] },
-    { path: '/users', label: 'Users', icon: Users, roles: ['admin'] },
+    { path: '/admin', label: t('nav.adminPanel'), icon: Settings, roles: ['admin', 'manager'] },
+    { path: '/users', label: t('nav.users'), icon: Users, roles: ['admin'] },
   ];
 
   const canAccess = (roles?: string[]) => {
@@ -113,7 +121,7 @@ export default function Layout() {
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <Recycle className="w-8 h-8 text-primary-600 mr-2" />
-              <span className="text-xl font-bold text-gray-900">RecycleApp</span>
+              <span className="text-xl font-bold text-gray-900">{t('appName')}</span>
             </div>
             <button
               onClick={() => setIsSidebarOpen(false)}
@@ -124,7 +132,7 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="p-4 space-y-2">
+        <nav className="p-4 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.path);
@@ -147,7 +155,7 @@ export default function Layout() {
           {crmItems.filter((item) => canAccess(item.roles)).length > 0 && (
             <>
               <div className="pt-4 pb-2">
-                <p className="text-xs font-semibold text-gray-400 uppercase px-4">CRM</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase px-4">{t('nav.crm')}</p>
               </div>
               {crmItems
                 .filter((item) => canAccess(item.roles))
@@ -175,7 +183,7 @@ export default function Layout() {
           {adminItems.filter((item) => canAccess(item.roles)).length > 0 && (
             <>
               <div className="pt-4 pb-2">
-                <p className="text-xs font-semibold text-gray-400 uppercase px-4">Admin</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase px-4">{t('nav.admin')}</p>
               </div>
               {adminItems
                 .filter((item) => canAccess(item.roles))
@@ -211,7 +219,7 @@ export default function Layout() {
             className="flex items-center justify-center w-full px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           >
             <LogOut className="w-4 h-4 mr-2" />
-            Logout
+            {t('common.logout')}
           </button>
         </div>
       </aside>
@@ -229,6 +237,16 @@ export default function Layout() {
             </button>
 
             <div className="flex items-center gap-4">
+              {/* Language toggle */}
+              <button
+                onClick={toggleLanguage}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title={i18n.language === 'es' ? 'Switch to English' : 'Cambiar a Espanol'}
+              >
+                <Globe className="w-4 h-4" />
+                <span className="font-medium uppercase">{i18n.language === 'es' ? 'EN' : 'ES'}</span>
+              </button>
+
               {/* Sync status */}
               <div className="flex items-center gap-2 text-sm">
                 {isOnline ? (
@@ -237,7 +255,7 @@ export default function Layout() {
                   <WifiOff className="w-5 h-5 text-red-600" />
                 )}
                 <span className={isOnline ? 'text-green-600' : 'text-red-600'}>
-                  {isOnline ? 'Online' : 'Offline'}
+                  {isOnline ? t('common.online') : t('common.offline')}
                 </span>
               </div>
 
@@ -246,7 +264,7 @@ export default function Layout() {
                 onClick={handleManualSync}
                 disabled={!isOnline || isSyncing}
                 className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Sync now"
+                title={t('common.syncNow')}
               >
                 <RefreshCw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
               </button>
