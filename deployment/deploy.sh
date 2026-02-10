@@ -291,29 +291,54 @@ npm run build
 log_success "Frontend built successfully!"
 
 ############################################
-# 6. PM2 Process Manager
+# 6. Systemd Service Setup
 ############################################
-log_info "Step 6: Setting up PM2 process manager..."
+log_info "Step 6: Setting up systemd service..."
 
-# Install PM2 globally if not already installed
-if ! command -v pm2 &> /dev/null; then
-    sudo npm install -g pm2
-fi
-
-# Stop existing process if upgrading
+# Stop existing service if upgrading
 if [ "$IS_UPGRADE" = true ]; then
     log_info "Stopping existing application..."
-    pm2 stop recycling-backend || true
-    pm2 delete recycling-backend || true
+    sudo systemctl stop recycling-api.service || true
 fi
 
-# Start backend with PM2
-cd $INSTALL_DIR/backend
-pm2 start npm --name "recycling-backend" -- start
-pm2 save
-pm2 startup systemd -u $USER --hp $HOME
+# Create deploy user if it doesn't exist
+if ! id -u deploy &>/dev/null 2>&1; then
+    log_info "Creating deploy user..."
+    sudo useradd --system --no-create-home --shell /usr/sbin/nologin deploy
+fi
 
-log_success "PM2 configured successfully!"
+# Install systemd service unit
+log_info "Installing systemd service unit..."
+sudo cp $INSTALL_DIR/deployment/recycling-api.service /etc/systemd/system/recycling-api.service
+
+# Update the service file with actual paths and user
+sudo sed -i "s|WorkingDirectory=.*|WorkingDirectory=$INSTALL_DIR/backend|" /etc/systemd/system/recycling-api.service
+sudo sed -i "s|EnvironmentFile=.*|EnvironmentFile=$INSTALL_DIR/backend/.env|" /etc/systemd/system/recycling-api.service
+sudo sed -i "s|ReadWritePaths=.*|ReadWritePaths=$INSTALL_DIR/backend/uploads $INSTALL_DIR/backend/logs|" /etc/systemd/system/recycling-api.service
+sudo sed -i "s|User=deploy|User=$USER|" /etc/systemd/system/recycling-api.service
+sudo sed -i "s|Group=deploy|Group=$USER|" /etc/systemd/system/recycling-api.service
+
+# Install the recycling target
+sudo cp $INSTALL_DIR/deployment/recycling.target /etc/systemd/system/recycling.target
+
+# Reload systemd daemon
+sudo systemctl daemon-reload
+
+# Enable and start the service
+sudo systemctl enable recycling-api.service
+sudo systemctl start recycling-api.service
+
+# Wait for the service to start
+sleep 3
+
+# Verify service is running
+if sudo systemctl is-active --quiet recycling-api.service; then
+    log_success "Systemd service configured and running!"
+else
+    log_error "Service failed to start. Checking logs..."
+    sudo journalctl -u recycling-api.service --no-pager -n 20
+    exit 1
+fi
 
 ############################################
 # 7. Nginx Configuration
@@ -430,9 +455,9 @@ echo "  Backend Port: $API_PORT"
 echo "  Database: $DB_NAME"
 echo ""
 log_info "Useful Commands:"
-echo "  View backend logs: pm2 logs recycling-backend"
-echo "  Restart backend: pm2 restart recycling-backend"
-echo "  View PM2 status: pm2 status"
+echo "  View backend logs: sudo journalctl -u recycling-api -f"
+echo "  Restart backend: sudo systemctl restart recycling-api"
+echo "  View service status: sudo systemctl status recycling-api"
 echo "  View Nginx logs: sudo tail -f /var/log/nginx/error.log"
 echo ""
 

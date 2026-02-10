@@ -20,7 +20,7 @@ A comprehensive multi-user recycling management system with offline support, rea
 - **Database**: PostgreSQL 14+ with partitioning and materialized views
 - **Offline**: IndexedDB with bidirectional sync
 - **Auth**: JWT tokens with refresh
-- **Deployment**: Docker, Docker Compose
+- **Deployment**: Docker, Docker Compose, systemd
 
 ## Quick Start
 

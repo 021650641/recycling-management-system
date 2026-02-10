@@ -104,13 +104,20 @@ cat > "$BACKEND_ENV_FILE" <<EOF
 # Node Environment
 NODE_ENV=$NODE_ENV
 PORT=$API_PORT
+API_PREFIX=/api/v1
 
 # Database Configuration
-DATABASE_URL=postgresql://$DB_USER:$DB_PASSWORD@localhost:5432/$DB_NAME
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=$DB_NAME
+DB_USER=$DB_USER
+DB_PASSWORD=$DB_PASSWORD
+DB_MAX_CONNECTIONS=20
 
 # Security
 JWT_SECRET=$JWT_SECRET
 JWT_EXPIRES_IN=7d
+JWT_REFRESH_EXPIRES_IN=30d
 
 # CORS Configuration
 CORS_ORIGIN=https://$DOMAIN_NAME
@@ -122,15 +129,8 @@ LOG_LEVEL=$LOG_LEVEL
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
 
-# File Upload (if needed)
+# File Upload
 MAX_FILE_SIZE=10485760
-
-# Session Configuration
-SESSION_SECRET=$(openssl rand -base64 32)
-
-# API Configuration
-API_VERSION=v1
-API_PREFIX=/api
 EOF
 
 chmod 600 "$BACKEND_ENV_FILE"
@@ -178,13 +178,20 @@ cat > "$INSTALL_DIR/backend/.env.example" <<'EOF'
 # Node Environment
 NODE_ENV=production
 PORT=5000
+API_PREFIX=/api/v1
 
 # Database Configuration
-DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=recycling_db
+DB_USER=recycling_user
+DB_PASSWORD=your_secure_password
+DB_MAX_CONNECTIONS=20
 
 # Security
 JWT_SECRET=your_secure_jwt_secret_min_32_characters
 JWT_EXPIRES_IN=7d
+JWT_REFRESH_EXPIRES_IN=30d
 
 # CORS Configuration
 CORS_ORIGIN=https://yourdomain.com
@@ -198,9 +205,6 @@ RATE_LIMIT_MAX_REQUESTS=100
 
 # File Upload
 MAX_FILE_SIZE=10485760
-
-# Session Configuration
-SESSION_SECRET=your_secure_session_secret
 EOF
 
 cat > "$INSTALL_DIR/frontend/.env.example" <<'EOF'
@@ -298,14 +302,13 @@ echo "  ✓ Rotate JWT secrets periodically"
 echo ""
 
 # Offer to restart services
-if command -v pm2 &> /dev/null; then
+if sudo systemctl is-enabled --quiet recycling-api.service 2>/dev/null; then
     read -p "Restart backend service to apply changes? (y/n) [y]: " RESTART
     RESTART=${RESTART:-y}
-    
+
     if [[ $RESTART =~ ^[Yy]$ ]]; then
         log_info "Restarting backend service..."
-        cd "$INSTALL_DIR/backend"
-        pm2 restart recycling-api || log_warning "PM2 service not running"
+        sudo systemctl restart recycling-api.service || log_warning "Service not running"
         log_success "Service restarted!"
     fi
 fi

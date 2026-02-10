@@ -25,10 +25,9 @@ Complete guide for deploying the Recycling Management System on a dedicated VPS.
 ### Required Software
 
 The deployment script will install these automatically:
-- Node.js 18.x
+- Node.js 20.x
 - PostgreSQL 14+
 - Nginx
-- PM2
 - Git
 - Certbot (for SSL)
 
@@ -37,7 +36,7 @@ The deployment script will install these automatically:
 Before deployment, point your domain to your VPS:
 
 ```
-A Record: yourdomain.com → YOUR_SERVER_IP
+A Record: yourdomain.com -> YOUR_SERVER_IP
 ```
 
 Wait for DNS propagation (5-30 minutes).
@@ -64,19 +63,16 @@ The script will prompt you for:
 - JWT secret
 - SSL certificate email
 
-**Deployment time**: 10-15 minutes
-
 ### What Gets Installed
 
-1. ✓ System updates and dependencies
-2. ✓ PostgreSQL database with optimized configuration
-3. ✓ Node.js backend API
-4. ✓ React frontend (built)
-5. ✓ Nginx web server
-6. ✓ SSL certificate (Let's Encrypt)
-7. ✓ PM2 process manager
-8. ✓ Firewall configuration
-9. ✓ Automated backup cron job
+1. System updates and dependencies
+2. PostgreSQL database with optimized configuration
+3. Node.js backend API
+4. React frontend (built)
+5. Nginx web server
+6. SSL certificate (Let's Encrypt)
+7. systemd service for backend process management
+8. Firewall configuration
 
 ## Manual Installation
 
@@ -89,7 +85,7 @@ If you prefer step-by-step control:
 sudo apt update && sudo apt upgrade -y
 
 # Install Node.js
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 
 # Install PostgreSQL
@@ -97,9 +93,6 @@ sudo apt install -y postgresql postgresql-contrib
 
 # Install Nginx
 sudo apt install -y nginx
-
-# Install PM2
-sudo npm install -g pm2
 
 # Install other tools
 sudo apt install -y git curl ufw certbot python3-certbot-nginx
@@ -181,13 +174,22 @@ sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-### 7. Start Backend with PM2
+### 7. Install and Start Backend with systemd
 
 ```bash
-cd /var/www/recycling/backend
-pm2 start dist/server.js --name recycling-api
-pm2 save
-pm2 startup
+# Copy the service file
+sudo cp /var/www/recycling/deployment/recycling-api.service /etc/systemd/system/
+
+# Edit the service file to match your paths and user
+sudo nano /etc/systemd/system/recycling-api.service
+
+# Reload systemd, enable and start the service
+sudo systemctl daemon-reload
+sudo systemctl enable recycling-api.service
+sudo systemctl start recycling-api.service
+
+# Verify it's running
+sudo systemctl status recycling-api
 ```
 
 ### 8. Configure SSL
@@ -213,8 +215,16 @@ sudo ufw enable
 ```env
 NODE_ENV=production
 PORT=5000
-DATABASE_URL=postgresql://user:pass@localhost:5432/recycling_db
+API_PREFIX=/api/v1
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=recycling_db
+DB_USER=recycling_user
+DB_PASSWORD=your_password
+DB_MAX_CONNECTIONS=20
 JWT_SECRET=your_secret_here
+JWT_EXPIRES_IN=7d
+JWT_REFRESH_EXPIRES_IN=30d
 CORS_ORIGIN=https://yourdomain.com
 ```
 
@@ -231,17 +241,18 @@ Test connection:
 PGPASSWORD=your_password psql -h localhost -U recycling_user -d recycling_db
 ```
 
-### PM2 Configuration
+### systemd Service Configuration
 
-The `ecosystem.config.js` file configures:
-- Cluster mode (uses all CPU cores)
-- Auto-restart on crash
-- Memory limit (500MB)
-- Log rotation
+The `recycling-api.service` unit file is installed to `/etc/systemd/system/` and provides:
+- Automatic restart on failure (5-second delay)
+- Memory limit (512MB)
+- Security hardening (NoNewPrivileges, ProtectSystem, PrivateTmp)
+- Dependency ordering (starts after PostgreSQL)
+- Logging via journald
 
-View configuration:
+View the service configuration:
 ```bash
-pm2 ecosystem
+sudo systemctl cat recycling-api
 ```
 
 ## Maintenance
@@ -282,24 +293,24 @@ Options:
 
 **View logs:**
 ```bash
-pm2 logs recycling-api
+sudo journalctl -u recycling-api -f
+```
+
+**View recent logs:**
+```bash
+sudo journalctl -u recycling-api --no-pager -n 100
 ```
 
 **Restart backend:**
 ```bash
-pm2 restart recycling-api
+sudo systemctl restart recycling-api
 ```
 
 **Check status:**
 ```bash
-pm2 status
+sudo systemctl status recycling-api
 sudo systemctl status nginx
 sudo systemctl status postgresql
-```
-
-**Monitor resources:**
-```bash
-pm2 monit
 ```
 
 ### Automated Backups
@@ -311,7 +322,7 @@ Backups run daily at 2:00 AM (configured in cron):
 crontab -l
 
 # Manual backup
-/var/www/recycling/backup.sh
+/var/www/recycling/deployment/backup.sh
 
 # View recent backups
 ls -lh ~/backups/recycling/
@@ -344,14 +355,15 @@ gunzip -c backup.sql.gz | sudo -u postgres psql recycling_db
 ### Backend Not Starting
 
 ```bash
-# Check logs
-pm2 logs recycling-api --lines 50
+# Check service status and logs
+sudo systemctl status recycling-api
+sudo journalctl -u recycling-api --no-pager -n 50
 
 # Check if port is in use
 sudo lsof -i :5000
 
 # Restart
-pm2 restart recycling-api
+sudo systemctl restart recycling-api
 ```
 
 ### Database Connection Failed
@@ -396,14 +408,12 @@ sudo systemctl status certbot.timer
 ### High Memory Usage
 
 ```bash
-# Check PM2 processes
-pm2 list
+# Check service resource usage
+systemctl status recycling-api
+sudo journalctl -u recycling-api --no-pager -n 20
 
-# Restart with memory limit
-pm2 restart recycling-api --max-memory-restart 300M
-
-# Monitor memory
-pm2 monit
+# Restart the service (systemd enforces MemoryMax=512M)
+sudo systemctl restart recycling-api
 ```
 
 ### Frontend Not Loading
@@ -438,7 +448,7 @@ ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
 "
 
 # Restart services
-pm2 restart recycling-api
+sudo systemctl restart recycling-api
 sudo systemctl restart postgresql
 ```
 
@@ -466,7 +476,7 @@ sudo systemctl restart postgresql
 
 5. **Monitor logs regularly:**
    ```bash
-   pm2 logs recycling-api
+   sudo journalctl -u recycling-api -f
    sudo tail -f /var/log/nginx/access.log
    ```
 
@@ -527,13 +537,14 @@ gpg --decrypt backup_file.tar.gz.gpg | tar -xz
 
 **API Health:**
 ```bash
-curl https://yourdomain.com/api/health
+curl https://yourdomain.com/health
 ```
 
-**PM2 Status:**
+**Service Status:**
 ```bash
-pm2 status
-pm2 monit
+sudo systemctl status recycling-api
+sudo systemctl status nginx
+sudo systemctl status postgresql
 ```
 
 **System Resources:**
@@ -545,19 +556,18 @@ top
 
 ### Log Locations
 
-- **Application Logs:** `pm2 logs recycling-api`
+- **Application Logs:** `sudo journalctl -u recycling-api`
 - **Nginx Access:** `/var/log/nginx/access.log`
 - **Nginx Error:** `/var/log/nginx/error.log`
 - **PostgreSQL:** `/var/log/postgresql/`
-- **Backup Logs:** `/var/www/recycling/logs/backup.log`
 
 ### Performance Monitoring
 
 ```bash
-# PM2 monitoring
-pm2 monit
+# systemd resource tracking
+systemd-cgtop
 
-# PostgreSQL queries
+# PostgreSQL active queries
 sudo -u postgres psql recycling_db -c "
 SELECT pid, age(clock_timestamp(), query_start), usename, query
 FROM pg_stat_activity
@@ -570,28 +580,31 @@ ORDER BY query_start DESC;
 
 After deployment, login with:
 
-- **Email:** admin@example.com
+- **Email:** admin@recycling.coop
 - **Password:** admin123
 
-⚠️ **IMPORTANT:** Change these immediately after first login!
+**IMPORTANT:** Change these immediately after first login!
 
 ## Useful Commands
 
 ```bash
-# View full status
-/var/www/recycling/status.sh
+# View service status
+sudo systemctl status recycling-api
+
+# View logs
+sudo journalctl -u recycling-api -f
+
+# Restart backend
+sudo systemctl restart recycling-api
 
 # Update application
-/var/www/recycling/update.sh
+/var/www/recycling/deployment/update.sh
 
 # Create backup
-/var/www/recycling/backup.sh
-
-# View deployment info
-cat /var/www/recycling/DEPLOYMENT_INFO.txt
+/var/www/recycling/deployment/backup.sh
 
 # Restart everything
-pm2 restart recycling-api
+sudo systemctl restart recycling-api
 sudo systemctl restart nginx
 ```
 

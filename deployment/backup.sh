@@ -106,13 +106,11 @@ if [[ "$BACKUP_TYPE" == "full" || "$BACKUP_TYPE" == "database" ]]; then
     
     # Get database name from backend .env
     if [ -f "$INSTALL_DIR/backend/.env" ]; then
-        source <(grep DATABASE_URL "$INSTALL_DIR/backend/.env" | sed 's/^/export /')
-        
-        # Parse DATABASE_URL (postgresql://user:pass@host:port/dbname)
-        DB_NAME=$(echo $DATABASE_URL | sed -n 's|.*postgresql://[^@]*@[^/]*/\([^?]*\).*|\1|p')
-        
+        # Read individual DB_ variables from .env
+        DB_NAME=$(grep -E '^DB_NAME=' "$INSTALL_DIR/backend/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+
         if [ -z "$DB_NAME" ]; then
-            log_error "Could not determine database name from .env file"
+            log_error "Could not determine database name from .env file (DB_NAME not set)"
             exit 1
         fi
         

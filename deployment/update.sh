@@ -212,24 +212,21 @@ fi
 #######################################
 log_info "Step 7: Restarting services..."
 
-# Restart PM2
-if command -v pm2 &> /dev/null; then
-    log_info "Restarting PM2 process..."
-    pm2 restart recycling-api
-    
-    # Wait for app to be ready
-    sleep 3
-    
-    # Check if app is running
-    if pm2 status recycling-api | grep -q "online"; then
-        log_success "Backend service restarted successfully!"
-    else
-        log_error "Backend service failed to start!"
-        pm2 logs recycling-api --lines 20
-        exit 1
-    fi
+# Restart backend via systemd
+log_info "Restarting recycling-api service..."
+sudo systemctl daemon-reload
+sudo systemctl restart recycling-api.service
+
+# Wait for app to be ready
+sleep 3
+
+# Check if app is running
+if sudo systemctl is-active --quiet recycling-api.service; then
+    log_success "Backend service restarted successfully!"
 else
-    log_warning "PM2 not found, skipping backend restart"
+    log_error "Backend service failed to start!"
+    sudo journalctl -u recycling-api.service --no-pager -n 20
+    exit 1
 fi
 
 # Reload Nginx
@@ -247,12 +244,12 @@ fi
 log_info "Step 8: Verifying update..."
 
 # Check API health
-if curl -f http://localhost:5000/api/health > /dev/null 2>&1; then
+if curl -f http://localhost:5000/health > /dev/null 2>&1; then
     log_success "API health check passed!"
 else
     log_error "API health check failed!"
     log_info "Checking logs..."
-    pm2 logs recycling-api --lines 30
+    sudo journalctl -u recycling-api.service --no-pager -n 30
 fi
 
 # Show current version
@@ -271,13 +268,13 @@ echo "  Commit: $CURRENT_VERSION"
 echo "  Updated: $(date)"
 echo ""
 log_info "Service Status:"
-pm2 status recycling-api
+sudo systemctl status recycling-api.service --no-pager
 echo ""
 log_info "Recent Logs (last 10 lines):"
-pm2 logs recycling-api --lines 10 --nostream
+sudo journalctl -u recycling-api.service --no-pager -n 10
 echo ""
 log_info "Useful Commands:"
-echo "  View logs:    pm2 logs recycling-api"
-echo "  Full status:  $INSTALL_DIR/status.sh"
+echo "  View logs:    sudo journalctl -u recycling-api -f"
+echo "  Full status:  sudo systemctl status recycling-api"
 echo "  Rollback:     cd $INSTALL_DIR && git checkout HEAD@{1} && $0"
 echo ""
