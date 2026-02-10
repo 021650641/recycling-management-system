@@ -112,7 +112,7 @@ router.get('/pending-payments', authorize('admin', 'manager'), async (req, res, 
       queryText += ' AND location_id = $1';
     }
 
-    queryText += ' ORDER BY material_category, apartment_name, waste_picker_name';
+    queryText += ' ORDER BY transaction_date';
 
     const result = await query(queryText, params);
 
@@ -122,41 +122,101 @@ router.get('/pending-payments', authorize('admin', 'manager'), async (req, res, 
   }
 });
 
-// Get dashboard summary
-router.get('/summary', async (req: any, res, next) => {
+// Get payment history
+router.get('/payment-history', authorize('admin', 'manager'), async (req, res, next) => {
   try {
-    const { startDate, endDate } = req.query;
-    
-    // Get purchase and sales counts
-    const transactionsResult = await query(
-      `SELECT 
-        COUNT(CASE WHEN source_type IN ('apartment', 'waste_picker') THEN 1 END) as purchases,
-        COUNT(CASE WHEN source_type = 'sale' THEN 1 END) as sales
-       FROM transaction 
-       WHERE transaction_date BETWEEN $1 AND $2`,
-      [startDate, endDate]
-    );
+    const { wastePickerId, startDate, endDate } = req.query;
 
-    // Get total current stock
-    const stockResult = await query(
-      `SELECT COALESCE(SUM(current_stock_kg), 0) as total_stock
-       FROM material`
-    );
+    let queryText = 'SELECT * FROM v_payment_history WHERE 1=1';
+    const params: any[] = [];
 
-    // Get pending payments
-    const paymentsResult = await query(
-      `SELECT COALESCE(SUM(total_cost), 0) as pending
-       FROM transaction 
-       WHERE payment_status = 'pending'
-         AND transaction_date BETWEEN $1 AND $2`,
-      [startDate, endDate]
-    );
+    if (wastePickerId) {
+      params.push(wastePickerId);
+      queryText += ` AND waste_picker_id = $${params.length}`;
+    }
+
+    if (startDate) {
+      params.push(startDate);
+      queryText += ` AND payment_date >= $${params.length}`;
+    }
+
+    if (endDate) {
+      params.push(endDate);
+      queryText += ` AND payment_date <= $${params.length}`;
+    }
+
+    queryText += ' ORDER BY payment_date DESC';
+
+    const result = await query(queryText, params);
+
+    res.json({ history: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get summary statistics
+router.get('/summary', async (req, res, next) => {
+  try {
+    const { locationId } = req.query;
+
+    // Get total materials collected
+    let materialsQuery = `
+      SELECT COALESCE(SUM(quantity_kg), 0) as total_kg
+      FROM transactions
+      WHERE 1=1
+    `;
+    const materialsParams: any[] = [];
+
+    if (locationId) {
+      materialsParams.push(locationId);
+      materialsQuery += ' AND location_id = $1';
+    }
+
+    const materialsResult = await query(materialsQuery, materialsParams);
+
+    // Get active locations count
+    let locationsQuery = `
+      SELECT COUNT(DISTINCT id) as count
+      FROM locations
+      WHERE active = true
+    `;
+    const locationsParams: any[] = [];
+
+    if (locationId) {
+      locationsParams.push(locationId);
+      locationsQuery += ' AND id = $1';
+    }
+
+    const locationsResult = await query(locationsQuery, locationsParams);
+
+    // Get active waste pickers count
+    const pickersResult = await query(`
+      SELECT COUNT(DISTINCT id) as count
+      FROM users
+      WHERE role = 'waste_picker' AND active = true
+    `);
+
+    // Get pending payments total
+    let paymentsQuery = `
+      SELECT COALESCE(SUM(amount_due), 0) as total
+      FROM v_pending_payments
+      WHERE 1=1
+    `;
+    const paymentsParams: any[] = [];
+
+    if (locationId) {
+      paymentsParams.push(locationId);
+      paymentsQuery += ' AND location_id = $1';
+    }
+
+    const paymentsResult = await query(paymentsQuery, paymentsParams);
 
     res.json({
-      totalPurchases: parseInt(transactionsResult.rows[0].purchases || 0),
-      totalSales: parseInt(transactionsResult.rows[0].sales || 0),
-      totalStock: parseFloat(stockResult.rows[0].total_stock || 0),
-      pendingPayments: parseFloat(paymentsResult.rows[0].pending || 0)
+      totalMaterialsKg: parseFloat(materialsResult.rows[0].total_kg) || 0,
+      activeLocations: parseInt(locationsResult.rows[0].count) || 0,
+      activeWastePickers: parseInt(pickersResult.rows[0].count) || 0,
+      pendingPayments: parseFloat(paymentsResult.rows[0].total) || 0
     });
   } catch (error) {
     next(error);
