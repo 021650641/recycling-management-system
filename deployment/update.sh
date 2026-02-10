@@ -160,7 +160,7 @@ cd "$INSTALL_DIR/backend"
 # Check if package.json changed
 if git diff HEAD@{1} --name-only | grep -q "backend/package.json"; then
     log_info "Dependencies changed, running npm install..."
-    npm install --production
+    npm install
 else
     log_info "No dependency changes detected"
 fi
@@ -181,7 +181,7 @@ cd "$INSTALL_DIR/frontend"
 # Check if package.json changed
 if git diff HEAD@{1} --name-only | grep -q "frontend/package.json"; then
     log_info "Dependencies changed, running npm install..."
-    npm install --production
+    npm install
 else
     log_info "No dependency changes detected"
 fi

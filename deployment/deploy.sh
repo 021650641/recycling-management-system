@@ -262,10 +262,15 @@ EOF
 fi
 
 log_info "Installing backend dependencies..."
-npm install --production
+npm install
+
+log_info "Building backend..."
+npm run build
 
 log_info "Running database migrations..."
-npm run migrate
+# node-pg-migrate requires DATABASE_URL; construct it from individual DB_ vars
+source .env 2>/dev/null
+DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST:-localhost}:${DB_PORT:-5432}/${DB_NAME}" npm run migrate
 
 log_success "Backend configured successfully!"
 
