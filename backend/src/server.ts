@@ -16,6 +16,7 @@ import materialRoutes from './routes/materials';
 import wastePickerRoutes from './routes/wastePickers';
 import apartmentRoutes from './routes/apartments';
 import clientRoutes from './routes/clients';
+import salesRoutes from './routes/sales';
 import syncRoutes from './routes/sync';
 import userRoutes from './routes/users';
 
@@ -53,6 +54,7 @@ apiRouter.use('/materials', materialRoutes);
 apiRouter.use('/waste-pickers', wastePickerRoutes);
 apiRouter.use('/apartments', apartmentRoutes);
 apiRouter.use('/clients', clientRoutes);
+apiRouter.use('/sales', salesRoutes);
 apiRouter.use('/sync', syncRoutes);
 apiRouter.use('/users', userRoutes);
 

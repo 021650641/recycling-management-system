@@ -39,4 +39,43 @@ router.post('/', authorize('admin', 'manager'), async (req, res, next) => {
   }
 });
 
+router.put('/:id', authorize('admin', 'manager'), async (req, res, next): Promise<any> => {
+  try {
+    const { name, address, totalUnits, contactName, contactPhone, contactEmail, isActive } = req.body;
+    const result = await query(
+      `UPDATE apartment_complex SET
+        name = COALESCE($1, name),
+        address = COALESCE($2, address),
+        total_units = COALESCE($3, total_units),
+        contact_name = COALESCE($4, contact_name),
+        contact_phone = COALESCE($5, contact_phone),
+        contact_email = COALESCE($6, contact_email),
+        is_active = COALESCE($7, is_active)
+      WHERE id = $8 RETURNING *`,
+      [name, address, totalUnits, contactName, contactPhone, contactEmail, isActive, req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Apartment complex not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/:id', authorize('admin'), async (req, res, next): Promise<any> => {
+  try {
+    const result = await query(
+      'UPDATE apartment_complex SET is_active = false WHERE id = $1 RETURNING *',
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Apartment complex not found' });
+    }
+    res.json({ message: 'Apartment complex deactivated' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

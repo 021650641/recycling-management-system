@@ -103,6 +103,42 @@ export const syncAPI = {
   getStatus: () => api.get('/sync/status'),
 };
 
+// Waste Pickers (Vendors) API
+export const wastePickersAPI = {
+  getAll: (params?: any) => api.get('/waste-pickers', { params }),
+  getById: (id: string) => api.get(`/waste-pickers/${id}`),
+  create: (data: any) => api.post('/waste-pickers', data),
+  update: (id: string, data: any) => api.put(`/waste-pickers/${id}`, data),
+  delete: (id: string) => api.delete(`/waste-pickers/${id}`),
+};
+
+// Clients API
+export const clientsAPI = {
+  getAll: (params?: any) => api.get('/clients', { params }),
+  getById: (id: string) => api.get(`/clients/${id}`),
+  create: (data: any) => api.post('/clients', data),
+  update: (id: string, data: any) => api.put(`/clients/${id}`, data),
+  delete: (id: string) => api.delete(`/clients/${id}`),
+};
+
+// Apartments API
+export const apartmentsAPI = {
+  getAll: (params?: any) => api.get('/apartments', { params }),
+  getById: (id: string) => api.get(`/apartments/${id}`),
+  create: (data: any) => api.post('/apartments', data),
+  update: (id: string, data: any) => api.put(`/apartments/${id}`, data),
+  delete: (id: string) => api.delete(`/apartments/${id}`),
+};
+
+// Sales API
+export const salesAPI = {
+  getAll: (params?: any) => api.get('/sales', { params }),
+  getById: (id: string) => api.get(`/sales/${id}`),
+  create: (data: any) => api.post('/sales', data),
+  updatePayment: (id: string, data: any) => api.patch(`/sales/${id}/payment`, data),
+  updateDelivery: (id: string, data: any) => api.patch(`/sales/${id}/delivery`, data),
+};
+
 // Users API
 export const usersAPI = {
   getAll: (params?: any) => api.get('/users', { params }),

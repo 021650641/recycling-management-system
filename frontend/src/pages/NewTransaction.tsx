@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { transactionsAPI, materialsAPI, locationsAPI, api } from '@/lib/api';
+import { transactionsAPI, materialsAPI, locationsAPI, wastePickersAPI, apartmentsAPI, api } from '@/lib/api';
 import { db } from '@/lib/db';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
@@ -13,6 +13,8 @@ export default function NewTransaction() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [materials, setMaterials] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
+  const [wastePickers, setWastePickers] = useState<any[]>([]);
+  const [apartments, setApartments] = useState<any[]>([]);
 
   useEffect(() => {
     loadFormData();
@@ -20,29 +22,36 @@ export default function NewTransaction() {
 
   const loadFormData = async () => {
     try {
-      const [matRes, locRes] = await Promise.all([
+      const [matRes, locRes, wpRes, aptRes] = await Promise.all([
         materialsAPI.getAll(),
         locationsAPI.getAll(),
+        wastePickersAPI.getAll(),
+        apartmentsAPI.getAll(),
       ]);
       const matData = Array.isArray(matRes.data) ? matRes.data : matRes.data?.materials || [];
       const locData = Array.isArray(locRes.data) ? locRes.data : locRes.data?.locations || [];
+      const wpData = Array.isArray(wpRes.data) ? wpRes.data : wpRes.data?.wastePickers || [];
+      const aptData = Array.isArray(aptRes.data) ? aptRes.data : aptRes.data?.apartments || [];
       setMaterials(matData.filter((m: any) => m.is_active !== false));
       setLocations(locData.filter((l: any) => l.is_active !== false));
+      setWastePickers(wpData.filter((wp: any) => wp.is_active !== false));
+      setApartments(aptData.filter((a: any) => a.is_active !== false));
     } catch (error) {
       console.error('Failed to load form data:', error);
     }
   };
 
   const [formData, setFormData] = useState({
-    type: 'purchase' as 'purchase' | 'sale',
+    sourceType: 'waste_picker' as 'waste_picker' | 'apartment',
+    wastePickerId: '',
+    apartmentComplexId: '',
+    apartmentUnit: '',
     materialId: '',
-    sourceLocationId: '',
-    destinationLocationId: '',
+    locationId: '',
     quantity: '',
     unitPrice: '',
-    supplierName: '',
-    supplierContact: '',
-    vehicleNumber: '',
+    qualityGrade: 'standard',
+    paymentMethod: 'cash',
     paymentStatus: 'paid' as 'paid' | 'pending' | 'partial',
     paidAmount: '',
     notes: '',
@@ -62,27 +71,20 @@ export default function NewTransaction() {
   }, []);
 
   useEffect(() => {
-    // Auto-fetch current price when material is selected
     if (formData.materialId && isOnline) {
       fetchCurrentPrice();
     }
-  }, [formData.materialId, formData.type, isOnline]);
+  }, [formData.materialId, isOnline]);
 
   const fetchCurrentPrice = async () => {
     try {
-      // Prices are at /materials/prices, not /prices/material/:id
       const response = await api.get('/materials/prices', {
         params: { date: new Date().toISOString().split('T')[0] }
       });
       const prices = Array.isArray(response.data) ? response.data : response.data?.prices || [];
-      const materialPrice = prices.find((p: any) => p.material_category_id === formData.materialId);
-      if (materialPrice) {
-        const price = formData.type === 'purchase'
-          ? materialPrice.purchase_price_per_kg
-          : materialPrice.sale_price_per_kg;
-        if (price) {
-          setFormData(prev => ({ ...prev, unitPrice: price.toString() }));
-        }
+      const materialPrice = prices.find((p: any) => String(p.material_category_id) === String(formData.materialId));
+      if (materialPrice && materialPrice.purchase_price_per_kg) {
+        setFormData(prev => ({ ...prev, unitPrice: materialPrice.purchase_price_per_kg.toString() }));
       }
     } catch (error) {
       console.error('Failed to fetch price:', error);
@@ -103,60 +105,72 @@ export default function NewTransaction() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.materialId || !formData.quantity || !formData.unitPrice) {
+    if (!formData.materialId || !formData.quantity || !formData.locationId) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    const totalAmount = parseFloat(calculateTotal());
-    const paidAmount = formData.paymentStatus === 'paid' 
-      ? totalAmount 
-      : parseFloat(formData.paidAmount) || 0;
+    if (formData.sourceType === 'waste_picker' && !formData.wastePickerId) {
+      toast.error('Please select a waste picker');
+      return;
+    }
 
-    const transactionData = {
-      type: formData.type,
-      materialId: parseInt(formData.materialId),
-      sourceLocationId: formData.sourceLocationId ? parseInt(formData.sourceLocationId) : undefined,
-      destinationLocationId: formData.destinationLocationId ? parseInt(formData.destinationLocationId) : undefined,
-      quantity: parseFloat(formData.quantity),
-      unitPrice: parseFloat(formData.unitPrice),
-      totalAmount,
-      paymentStatus: formData.paymentStatus,
-      paidAmount,
-      supplierName: formData.supplierName || undefined,
-      supplierContact: formData.supplierContact || undefined,
-      vehicleNumber: formData.vehicleNumber || undefined,
+    if (formData.sourceType === 'apartment' && !formData.apartmentComplexId) {
+      toast.error('Please select an apartment complex');
+      return;
+    }
+
+    const transactionData: any = {
+      locationId: parseInt(formData.locationId),
+      materialCategoryId: parseInt(formData.materialId),
+      sourceType: formData.sourceType,
+      weightKg: parseFloat(formData.quantity),
+      qualityGrade: formData.qualityGrade,
+      paymentMethod: formData.paymentMethod,
       notes: formData.notes || undefined,
-      userId: user!.id,
-      createdAt: new Date().toISOString(),
-      synced: false,
-      localId: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     };
+
+    if (formData.sourceType === 'waste_picker') {
+      transactionData.wastePickerId = formData.wastePickerId;
+    } else {
+      transactionData.apartmentComplexId = formData.apartmentComplexId;
+      transactionData.apartmentUnit = formData.apartmentUnit || undefined;
+    }
 
     setIsSubmitting(true);
     try {
       if (isOnline) {
-        // Try to save to server
         await transactionsAPI.create(transactionData);
         toast.success('Transaction created successfully');
       } else {
-        // Save to local DB for offline sync
-        await db.transactions.add(transactionData);
+        await db.transactions.add({
+          ...transactionData,
+          synced: false,
+          localId: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          createdAt: new Date().toISOString(),
+          userId: user!.id,
+        });
         toast.success('Transaction saved locally - will sync when online');
       }
       navigate('/transactions');
     } catch (error: any) {
-      // If online save fails, fallback to local storage
+      const errMsg = error.response?.data?.error || 'Failed to save transaction';
       if (isOnline) {
         try {
-          await db.transactions.add(transactionData);
+          await db.transactions.add({
+            ...transactionData,
+            synced: false,
+            localId: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            createdAt: new Date().toISOString(),
+            userId: user!.id,
+          });
           toast.success('Transaction saved locally - will sync later');
           navigate('/transactions');
         } catch (dbError) {
-          toast.error('Failed to save transaction');
+          toast.error(errMsg);
         }
       } else {
-        toast.error('Failed to save transaction');
+        toast.error(errMsg);
       }
     } finally {
       setIsSubmitting(false);
@@ -184,38 +198,101 @@ export default function NewTransaction() {
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-        {/* Transaction Type */}
+        {/* Source Type */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Transaction Type *
+            Source Type *
           </label>
           <div className="grid grid-cols-2 gap-4">
             <button
               type="button"
-              onClick={() => setFormData(prev => ({ ...prev, type: 'purchase' }))}
+              onClick={() => setFormData(prev => ({ ...prev, sourceType: 'waste_picker', apartmentComplexId: '', apartmentUnit: '' }))}
               className={`p-4 border-2 rounded-lg font-medium transition-colors ${
-                formData.type === 'purchase'
+                formData.sourceType === 'waste_picker'
                   ? 'border-primary-600 bg-primary-50 text-primary-700'
                   : 'border-gray-300 hover:border-gray-400'
               }`}
             >
-              Purchase (Buying)
+              Waste Picker
             </button>
             <button
               type="button"
-              onClick={() => setFormData(prev => ({ ...prev, type: 'sale' }))}
+              onClick={() => setFormData(prev => ({ ...prev, sourceType: 'apartment', wastePickerId: '' }))}
               className={`p-4 border-2 rounded-lg font-medium transition-colors ${
-                formData.type === 'sale'
+                formData.sourceType === 'apartment'
                   ? 'border-primary-600 bg-primary-50 text-primary-700'
                   : 'border-gray-300 hover:border-gray-400'
               }`}
             >
-              Sale (Selling)
+              Apartment / Building
             </button>
           </div>
         </div>
 
-        {/* Material & Locations */}
+        {/* Source Selection */}
+        {formData.sourceType === 'waste_picker' ? (
+          <div>
+            <label htmlFor="wastePickerId" className="block text-sm font-medium text-gray-700 mb-2">
+              Waste Picker *
+            </label>
+            <select
+              id="wastePickerId"
+              name="wastePickerId"
+              value={formData.wastePickerId}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+              required
+            >
+              <option value="">Select waste picker</option>
+              {wastePickers.map((wp) => (
+                <option key={wp.id} value={wp.id}>
+                  {wp.first_name} {wp.last_name}
+                  {wp.id_number ? ` (${wp.id_number})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="apartmentComplexId" className="block text-sm font-medium text-gray-700 mb-2">
+                Apartment Complex *
+              </label>
+              <select
+                id="apartmentComplexId"
+                name="apartmentComplexId"
+                value={formData.apartmentComplexId}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                required
+              >
+                <option value="">Select apartment complex</option>
+                {apartments.map((apt) => (
+                  <option key={apt.id} value={apt.id}>
+                    {apt.name}
+                    {apt.total_units ? ` (${apt.total_units} units)` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="apartmentUnit" className="block text-sm font-medium text-gray-700 mb-2">
+                Unit Number
+              </label>
+              <input
+                id="apartmentUnit"
+                name="apartmentUnit"
+                type="text"
+                value={formData.apartmentUnit}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                placeholder="e.g. 4B, 12, Unit 3"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Material & Location */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="materialId" className="block text-sm font-medium text-gray-700 mb-2">
@@ -230,62 +307,41 @@ export default function NewTransaction() {
               required
             >
               <option value="">Select material</option>
-              {materials?.map((material) => (
+              {materials.map((material) => (
                 <option key={material.id} value={material.id}>
-                  {material.name} ({material.category})
+                  {material.name}
                 </option>
               ))}
             </select>
           </div>
 
-          {formData.type === 'purchase' ? (
-            <div>
-              <label htmlFor="destinationLocationId" className="block text-sm font-medium text-gray-700 mb-2">
-                Destination Location
-              </label>
-              <select
-                id="destinationLocationId"
-                name="destinationLocationId"
-                value={formData.destinationLocationId}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-              >
-                <option value="">Select location</option>
-                {locations?.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name} ({location.type})
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div>
-              <label htmlFor="sourceLocationId" className="block text-sm font-medium text-gray-700 mb-2">
-                Source Location
-              </label>
-              <select
-                id="sourceLocationId"
-                name="sourceLocationId"
-                value={formData.sourceLocationId}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-              >
-                <option value="">Select location</option>
-                {locations?.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name} ({location.type})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div>
+            <label htmlFor="locationId" className="block text-sm font-medium text-gray-700 mb-2">
+              Drop-off Location *
+            </label>
+            <select
+              id="locationId"
+              name="locationId"
+              value={formData.locationId}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+              required
+            >
+              <option value="">Select location</option>
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* Quantity & Price */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Quantity, Price & Quality */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-2">
-              Quantity (kg) *
+              Weight (kg) *
             </label>
             <input
               id="quantity"
@@ -302,7 +358,7 @@ export default function NewTransaction() {
 
           <div>
             <label htmlFor="unitPrice" className="block text-sm font-medium text-gray-700 mb-2">
-              Unit Price ($) *
+              Unit Price (auto-filled)
             </label>
             <input
               id="unitPrice"
@@ -311,10 +367,27 @@ export default function NewTransaction() {
               step="0.01"
               value={formData.unitPrice}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-              placeholder="0.00"
-              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none bg-gray-50"
+              placeholder="Auto"
+              readOnly
             />
+          </div>
+
+          <div>
+            <label htmlFor="qualityGrade" className="block text-sm font-medium text-gray-700 mb-2">
+              Quality Grade
+            </label>
+            <select
+              id="qualityGrade"
+              name="qualityGrade"
+              value={formData.qualityGrade}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+            >
+              <option value="standard">Standard</option>
+              <option value="premium">Premium</option>
+              <option value="low">Low</option>
+            </select>
           </div>
 
           <div>
@@ -327,99 +400,67 @@ export default function NewTransaction() {
           </div>
         </div>
 
-        {/* Supplier Info (for purchases) */}
-        {formData.type === 'purchase' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label htmlFor="supplierName" className="block text-sm font-medium text-gray-700 mb-2">
-                Supplier Name
-              </label>
-              <input
-                id="supplierName"
-                name="supplierName"
-                type="text"
-                value={formData.supplierName}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                placeholder="John Doe"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="supplierContact" className="block text-sm font-medium text-gray-700 mb-2">
-                Contact Number
-              </label>
-              <input
-                id="supplierContact"
-                name="supplierContact"
-                type="text"
-                value={formData.supplierContact}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                placeholder="+1234567890"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="vehicleNumber" className="block text-sm font-medium text-gray-700 mb-2">
-                Vehicle Number
-              </label>
-              <input
-                id="vehicleNumber"
-                name="vehicleNumber"
-                type="text"
-                value={formData.vehicleNumber}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                placeholder="ABC-1234"
-              />
-            </div>
+        {/* Payment */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-700 mb-2">
+              Payment Method
+            </label>
+            <select
+              id="paymentMethod"
+              name="paymentMethod"
+              value={formData.paymentMethod}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+            >
+              <option value="cash">Cash</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="mobile_money">Mobile Money</option>
+            </select>
           </div>
-        )}
 
-        {/* Payment Status */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Payment Status *
-          </label>
-          <div className="grid grid-cols-3 gap-4">
-            <button
-              type="button"
-              onClick={() => setFormData(prev => ({ ...prev, paymentStatus: 'paid', paidAmount: calculateTotal() }))}
-              className={`p-3 border-2 rounded-lg font-medium transition-colors ${
-                formData.paymentStatus === 'paid'
-                  ? 'border-green-600 bg-green-50 text-green-700'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              Paid
-            </button>
-            <button
-              type="button"
-              onClick={() => setFormData(prev => ({ ...prev, paymentStatus: 'partial', paidAmount: '' }))}
-              className={`p-3 border-2 rounded-lg font-medium transition-colors ${
-                formData.paymentStatus === 'partial'
-                  ? 'border-yellow-600 bg-yellow-50 text-yellow-700'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              Partial
-            </button>
-            <button
-              type="button"
-              onClick={() => setFormData(prev => ({ ...prev, paymentStatus: 'pending', paidAmount: '0' }))}
-              className={`p-3 border-2 rounded-lg font-medium transition-colors ${
-                formData.paymentStatus === 'pending'
-                  ? 'border-red-600 bg-red-50 text-red-700'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              Pending
-            </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Payment Status *
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, paymentStatus: 'paid', paidAmount: calculateTotal() }))}
+                className={`p-2 border-2 rounded-lg text-sm font-medium transition-colors ${
+                  formData.paymentStatus === 'paid'
+                    ? 'border-green-600 bg-green-50 text-green-700'
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                Paid
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, paymentStatus: 'partial', paidAmount: '' }))}
+                className={`p-2 border-2 rounded-lg text-sm font-medium transition-colors ${
+                  formData.paymentStatus === 'partial'
+                    ? 'border-yellow-600 bg-yellow-50 text-yellow-700'
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                Partial
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, paymentStatus: 'pending', paidAmount: '0' }))}
+                className={`p-2 border-2 rounded-lg text-sm font-medium transition-colors ${
+                  formData.paymentStatus === 'pending'
+                    ? 'border-red-600 bg-red-50 text-red-700'
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                Pending
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Paid Amount (for partial payments) */}
         {formData.paymentStatus === 'partial' && (
           <div>
             <label htmlFor="paidAmount" className="block text-sm font-medium text-gray-700 mb-2">

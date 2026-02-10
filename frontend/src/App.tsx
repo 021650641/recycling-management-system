@@ -16,6 +16,11 @@ import Inventory from '@/pages/Inventory';
 import Reports from '@/pages/Reports';
 import AdminPanel from '@/pages/AdminPanel';
 import UsersPage from '@/pages/Users';
+import Vendors from '@/pages/Vendors';
+import Clients from '@/pages/Clients';
+import Sources from '@/pages/Sources';
+import SalesPage from '@/pages/Sales';
+import Traceability from '@/pages/Traceability';
 
 // Protected Route Component
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
@@ -70,6 +75,18 @@ function App() {
           <Route path="transactions/new" element={<NewTransaction />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="vendors" element={<Vendors />} />
+          <Route path="clients" element={<Clients />} />
+          <Route path="sources" element={<Sources />} />
+          <Route path="sales" element={<SalesPage />} />
+          <Route
+            path="traceability"
+            element={
+              <ProtectedRoute requiredRole={['admin', 'manager']}>
+                <Traceability />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="admin"
             element={

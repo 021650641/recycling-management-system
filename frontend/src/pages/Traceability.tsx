@@ -1,0 +1,337 @@
+import { useState, useEffect } from 'react';
+import { api, wastePickersAPI, apartmentsAPI, materialsAPI } from '@/lib/api';
+import { Search, GitBranch, Filter } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+interface TraceTransaction {
+  transaction_id: string;
+  transaction_number: string;
+  transaction_date: string;
+  source_type: string;
+  source_name: string;
+  apartment_id: string;
+  apartment_name: string;
+  apartment_unit: string;
+  waste_picker_id: string;
+  waste_picker_name: string;
+  location_id: number;
+  location_name: string;
+  material_id: number;
+  material_category: string;
+  weight_kg: number;
+  quality_grade: string;
+  unit_price: number;
+  total_cost: number;
+  payment_status: string;
+}
+
+interface TraceSummary {
+  source_type: string;
+  source_name: string;
+  material_category: string;
+  total_weight_kg: number;
+  transaction_count: number;
+  total_cost: number;
+  first_transaction: string;
+  last_transaction: string;
+}
+
+export default function Traceability() {
+  const [transactions, setTransactions] = useState<TraceTransaction[]>([]);
+  const [summary, setSummary] = useState<TraceSummary[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
+
+  const [wastePickers, setWastePickers] = useState<any[]>([]);
+  const [apartments, setApartments] = useState<any[]>([]);
+  const [materials, setMaterials] = useState<any[]>([]);
+
+  const [filters, setFilters] = useState({
+    apartmentId: '',
+    wastePickerId: '',
+    materialId: '',
+    startDate: '',
+    endDate: '',
+    days: '42',
+  });
+
+  useEffect(() => {
+    loadFilterOptions();
+  }, []);
+
+  const loadFilterOptions = async () => {
+    try {
+      const [wpRes, aptRes, matRes] = await Promise.all([
+        wastePickersAPI.getAll(),
+        apartmentsAPI.getAll(),
+        materialsAPI.getAll(),
+      ]);
+      setWastePickers(Array.isArray(wpRes.data) ? wpRes.data : wpRes.data?.wastePickers || []);
+      setApartments(Array.isArray(aptRes.data) ? aptRes.data : aptRes.data?.apartments || []);
+      setMaterials(Array.isArray(matRes.data) ? matRes.data : matRes.data?.materials || []);
+    } catch (error) {
+      console.error('Failed to load filter options:', error);
+    }
+  };
+
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setLoading(true);
+    try {
+      const params: any = {};
+      if (filters.apartmentId) params.apartmentId = filters.apartmentId;
+      if (filters.wastePickerId) params.wastePickerId = filters.wastePickerId;
+      if (filters.materialId) params.materialId = filters.materialId;
+      if (filters.startDate) params.startDate = filters.startDate;
+      if (filters.endDate) params.endDate = filters.endDate;
+      if (!filters.startDate && !filters.endDate && filters.days) params.days = filters.days;
+
+      const response = await api.get('/reports/traceability', { params });
+      setTransactions(response.data?.transactions || []);
+      setSummary(response.data?.summary || []);
+    } catch (error) {
+      console.error('Failed to load traceability data:', error);
+      toast.error('Failed to load traceability data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      apartmentId: '',
+      wastePickerId: '',
+      materialId: '',
+      startDate: '',
+      endDate: '',
+      days: '42',
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <GitBranch className="w-7 h-7 text-primary-600" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Traceability</h1>
+            <p className="text-sm text-gray-500">Track materials from source to buyer</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg"
+        >
+          <Filter className="w-4 h-4" />
+          {showFilters ? 'Hide Filters' : 'Show Filters'}
+        </button>
+      </div>
+
+      {showFilters && (
+        <form onSubmit={handleSearch} className="bg-white p-6 rounded-lg shadow space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Source (Apartment)</label>
+              <select
+                value={filters.apartmentId}
+                onChange={(e) => setFilters({ ...filters, apartmentId: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              >
+                <option value="">All apartments</option>
+                {apartments.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Waste Picker</label>
+              <select
+                value={filters.wastePickerId}
+                onChange={(e) => setFilters({ ...filters, wastePickerId: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              >
+                <option value="">All waste pickers</option>
+                {wastePickers.map((wp) => (
+                  <option key={wp.id} value={wp.id}>{wp.first_name} {wp.last_name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Material</label>
+              <select
+                value={filters.materialId}
+                onChange={(e) => setFilters({ ...filters, materialId: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              >
+                <option value="">All materials</option>
+                {materials.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+              <input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+              <input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Last N Days</label>
+              <input
+                type="number"
+                value={filters.days}
+                onChange={(e) => setFilters({ ...filters, days: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                placeholder="42"
+                disabled={!!filters.startDate || !!filters.endDate}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
+              <Search className="w-4 h-4" /> Search
+            </button>
+            <button type="button" onClick={clearFilters} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">
+              Clear
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Summary Cards */}
+      {summary.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">Summary</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {summary.map((s, i) => (
+              <div key={i} className="bg-white rounded-lg shadow p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      {s.source_type === 'apartment' ? 'Apartment' : 'Waste Picker'}
+                    </p>
+                    <p className="text-base font-semibold text-gray-900">{s.source_name || 'Unknown'}</p>
+                  </div>
+                  <span className="px-2 py-1 text-xs font-semibold rounded-full bg-primary-100 text-primary-800">
+                    {s.material_category}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className="text-gray-500">Total Weight</p>
+                    <p className="font-medium">{Number(s.total_weight_kg).toFixed(2)} kg</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Transactions</p>
+                    <p className="font-medium">{s.transaction_count}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Total Cost</p>
+                    <p className="font-medium">${Number(s.total_cost || 0).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Period</p>
+                    <p className="font-medium text-xs">
+                      {s.first_transaction ? new Date(s.first_transaction).toLocaleDateString() : '-'}
+                      {' - '}
+                      {s.last_transaction ? new Date(s.last_transaction).toLocaleDateString() : '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Transactions Table */}
+      {loading ? (
+        <div className="text-center py-12 text-gray-500">Loading traceability data...</div>
+      ) : transactions.length > 0 ? (
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">
+            Transactions ({transactions.length})
+          </h2>
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction #</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Weight (kg)</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cost</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Payment</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {transactions.map((t) => (
+                    <tr key={t.transaction_id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {t.transaction_date ? new Date(t.transaction_date).toLocaleDateString() : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-mono text-gray-900">{t.transaction_number}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        <div>
+                          <p>{t.source_name || '-'}</p>
+                          <p className="text-xs text-gray-500">
+                            {t.source_type === 'apartment' ? 'Apartment' : 'Waste Picker'}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{t.location_name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        <div>
+                          <p>{t.material_category}</p>
+                          {t.quality_grade && t.quality_grade !== 'standard' && (
+                            <p className="text-xs text-gray-500">Grade: {t.quality_grade}</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                        {Number(t.weight_kg).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                        ${Number(t.total_cost || 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          t.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
+                          t.payment_status === 'partial' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {t.payment_status || 'pending'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : !loading && (
+        <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
+          <GitBranch className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+          <p className="text-lg font-medium">No traceability data</p>
+          <p className="text-sm mt-1">Use the filters above to search for transaction chains</p>
+        </div>
+      )}
+    </div>
+  );
+}
