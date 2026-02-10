@@ -112,7 +112,7 @@ router.get('/pending-payments', authorize('admin', 'manager'), async (req, res, 
       queryText += ' AND location_id = $1';
     }
 
-    queryText += ' ORDER BY transaction_date, waste_picker_name';
+    queryText += ' ORDER BY material_category, apartment_name, waste_picker_name';
 
     const result = await query(queryText, params);
 
@@ -127,47 +127,36 @@ router.get('/summary', async (req: any, res, next) => {
   try {
     const { startDate, endDate } = req.query;
     
-    // Get total transactions
+    // Get purchase and sales counts
     const transactionsResult = await query(
-      `SELECT COUNT(*) as count, 
-              COALESCE(SUM(total_cost), 0) as total_value
-       FROM transaction 
-       WHERE transaction_date BETWEEN $1 AND $2`,
-      [startDate, endDate]
-    );
-
-    // Get total weight by type
-    const weightResult = await query(
       `SELECT 
-        SUM(CASE WHEN source_type = 'apartment' THEN weight_kg ELSE 0 END) as apartment_weight,
-        SUM(CASE WHEN source_type = 'waste_picker' THEN weight_kg ELSE 0 END) as waste_picker_weight
+        COUNT(CASE WHEN source_type IN ('apartment', 'waste_picker') THEN 1 END) as purchases,
+        COUNT(CASE WHEN source_type = 'sale' THEN 1 END) as sales
        FROM transaction 
        WHERE transaction_date BETWEEN $1 AND $2`,
       [startDate, endDate]
     );
 
-    // Get material breakdown
-    const materialsResult = await query(
-      `SELECT mc.name as material, 
-              COALESCE(SUM(t.weight_kg), 0) as weight
-       FROM material_category mc
-       LEFT JOIN transaction t ON mc.id = t.material_category_id 
-         AND t.transaction_date BETWEEN $1 AND $2
-       GROUP BY mc.name
-       ORDER BY weight DESC`,
+    // Get total current stock
+    const stockResult = await query(
+      `SELECT COALESCE(SUM(current_stock_kg), 0) as total_stock
+       FROM material`
+    );
+
+    // Get pending payments
+    const paymentsResult = await query(
+      `SELECT COALESCE(SUM(total_cost), 0) as pending
+       FROM transaction 
+       WHERE payment_status = 'pending'
+         AND transaction_date BETWEEN $1 AND $2`,
       [startDate, endDate]
     );
 
     res.json({
-      transactions: {
-        count: parseInt(transactionsResult.rows[0].count),
-        totalValue: parseFloat(transactionsResult.rows[0].total_value)
-      },
-      weight: {
-        apartments: parseFloat(weightResult.rows[0].apartment_weight || 0),
-        wastePickers: parseFloat(weightResult.rows[0].waste_picker_weight || 0)
-      },
-      materials: materialsResult.rows
+      totalPurchases: parseInt(transactionsResult.rows[0].purchases || 0),
+      totalSales: parseInt(transactionsResult.rows[0].sales || 0),
+      totalStock: parseFloat(stockResult.rows[0].total_stock || 0),
+      pendingPayments: parseFloat(paymentsResult.rows[0].pending || 0)
     });
   } catch (error) {
     next(error);
