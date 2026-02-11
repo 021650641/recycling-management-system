@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { reportsAPI } from '@/lib/api';
 import { useTranslation } from 'react-i18next';
-import { Download, Calendar, TrendingUp, DollarSign, Mail, FileText, X, ShoppingCart, Users, GitBranch } from 'lucide-react';
+import { Download, Calendar, TrendingUp, DollarSign, Mail, FileText, X, ShoppingCart, Users, GitBranch, RefreshCw } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
@@ -11,7 +11,7 @@ type ExportFormat = 'pdf' | 'csv' | 'excel';
 
 export default function Reports() {
   const { t } = useTranslation();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<ReportTab>('overview');
   const [summary, setSummary] = useState<any>(null);
   const [trends, setTrends] = useState<any[]>([]);
@@ -22,6 +22,8 @@ export default function Reports() {
   const [salesGroupBy, setSalesGroupBy] = useState('client');
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [emailConfigured, setEmailConfigured] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
   const [dateRange, setDateRange] = useState({
     startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd'),
@@ -29,11 +31,19 @@ export default function Reports() {
 
   useEffect(() => {
     reportsAPI.getEmailStatus().then(res => setEmailConfigured(res.data?.configured)).catch(() => {});
+    loadReports();
   }, []);
 
+  // Close export menu when clicking outside
   useEffect(() => {
-    loadReports();
-  }, [dateRange, activeTab, purchaseGroupBy, salesGroupBy]);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadReports = async () => {
     setLoading(true);
@@ -53,6 +63,8 @@ export default function Reports() {
       } else if (activeTab === 'sales') {
         const res = await reportsAPI.getSales({ ...dateRange, groupBy: salesGroupBy === 'detailed' ? undefined : salesGroupBy });
         setSales(res.data?.sales || []);
+      } else if (activeTab === 'traceability') {
+        // Traceability tab loads its own data independently
       }
     } catch (error) {
       console.error('Failed to load reports:', error);
@@ -97,22 +109,31 @@ export default function Reports() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900">{t('reports.title')}</h1>
         <div className="flex items-center gap-2">
-          <div className="relative group">
-            <button className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">
+          <button onClick={() => loadReports()}
+            disabled={loading}
+            className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50">
+            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            {t('common.refresh') || 'Refresh'}
+          </button>
+          <div className="relative" ref={exportRef}>
+            <button onClick={() => setShowExportMenu(!showExportMenu)}
+              className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">
               <Download className="w-5 h-5" />
               {t('reports.exportReport')}
             </button>
-            <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 hidden group-hover:block z-10 min-w-[140px]">
-              <button onClick={() => handleExport('pdf')} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-red-500" /> PDF
-              </button>
-              <button onClick={() => handleExport('csv')} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-green-500" /> CSV
-              </button>
-              <button onClick={() => handleExport('excel')} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-blue-500" /> Excel
-              </button>
-            </div>
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 min-w-[140px]">
+                <button onClick={() => { handleExport('pdf'); setShowExportMenu(false); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-red-500" /> PDF
+                </button>
+                <button onClick={() => { handleExport('csv'); setShowExportMenu(false); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-green-500" /> CSV
+                </button>
+                <button onClick={() => { handleExport('excel'); setShowExportMenu(false); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-blue-500" /> Excel
+                </button>
+              </div>
+            )}
           </div>
           <button onClick={() => setShowEmailDialog(true)}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
@@ -454,11 +475,19 @@ function SalesTab({ data, groupBy, setGroupBy, t }: any) {
 function TraceabilityTab({ dateRange, t }: any) {
   const [data, setData] = useState<any>({ transactions: [], summary: [] });
   const [loading, setLoading] = useState(true);
+  const dateKey = `${dateRange.startDate}_${dateRange.endDate}`;
+
+  const loadData = () => {
+    setLoading(true);
+    reportsAPI.getTraceability(dateRange)
+      .then(res => setData(res.data || { transactions: [], summary: [] }))
+      .catch(() => setData({ transactions: [], summary: [] }))
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
-    setLoading(true);
-    reportsAPI.getTraceability(dateRange).then(res => setData(res.data)).catch(() => {}).finally(() => setLoading(false));
-  }, [dateRange]);
+    loadData();
+  }, [dateKey]);
 
   if (loading) return <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>;
 
