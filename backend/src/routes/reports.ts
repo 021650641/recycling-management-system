@@ -314,7 +314,12 @@ router.get('/traceability', async (req, res, next) => {
       LEFT JOIN apartment_unit au ON t.apartment_unit_id = au.id
       LEFT JOIN waste_picker wp ON t.waste_picker_id = wp.id
       ${where}
-      GROUP BY t.source_type, source_name, mc.name
+      GROUP BY t.source_type,
+        CASE
+          WHEN t.source_type = 'apartment' THEN ac.name || COALESCE(' - Unit ' || COALESCE(au.unit_number, t.apartment_unit), '')
+          WHEN t.source_type = 'waste_picker' THEN wp.first_name || ' ' || wp.last_name
+        END,
+        mc.name
       ORDER BY total_weight_kg DESC
     `, sParams);
 
