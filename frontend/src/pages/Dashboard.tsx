@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { reportsAPI } from '@/lib/api';
@@ -7,6 +8,7 @@ import { Plus, TrendingUp, TrendingDown, Package, DollarSign } from 'lucide-reac
 import { format } from 'date-fns';
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -43,13 +45,13 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('dashboard.title')}</h1>
         <Link
           to="/transactions/new"
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors"
         >
           <Plus className="w-5 h-5" />
-          New Transaction
+          {t('dashboard.newTransaction')}
         </Link>
       </div>
 
@@ -58,7 +60,7 @@ export default function Dashboard() {
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Purchases</p>
+              <p className="text-sm text-gray-600">{t('dashboard.totalPurchases')}</p>
               <p className="text-2xl font-bold text-gray-900">
                 {loading ? '...' : summary?.totalPurchases || 0}
               </p>
@@ -67,13 +69,13 @@ export default function Dashboard() {
               <TrendingDown className="w-6 h-6 text-green-600" />
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Last 30 days</p>
+          <p className="text-xs text-gray-500 mt-2">{t('dashboard.last30days')}</p>
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Sales</p>
+              <p className="text-sm text-gray-600">{t('dashboard.totalSales')}</p>
               <p className="text-2xl font-bold text-gray-900">
                 {loading ? '...' : summary?.totalSales || 0}
               </p>
@@ -82,13 +84,13 @@ export default function Dashboard() {
               <TrendingUp className="w-6 h-6 text-blue-600" />
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Last 30 days</p>
+          <p className="text-xs text-gray-500 mt-2">{t('dashboard.last30days')}</p>
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Current Stock</p>
+              <p className="text-sm text-gray-600">{t('dashboard.currentStock')}</p>
               <p className="text-2xl font-bold text-gray-900">
                 {loading ? '...' : summary?.totalStock || 0}
               </p>
@@ -97,13 +99,13 @@ export default function Dashboard() {
               <Package className="w-6 h-6 text-yellow-600" />
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">All materials</p>
+          <p className="text-xs text-gray-500 mt-2">{t('dashboard.allMaterials')}</p>
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Pending Payments</p>
+              <p className="text-sm text-gray-600">{t('dashboard.pendingPayments')}</p>
               <p className="text-2xl font-bold text-gray-900">
                 ${loading ? '...' : summary?.pendingPayments?.toFixed(2) || '0.00'}
               </p>
@@ -112,7 +114,7 @@ export default function Dashboard() {
               <DollarSign className="w-6 h-6 text-red-600" />
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Outstanding</p>
+          <p className="text-xs text-gray-500 mt-2">{t('dashboard.outstanding')}</p>
         </div>
       </div>
 
@@ -120,11 +122,11 @@ export default function Dashboard() {
         {/* Recent Transactions */}
         <div className="bg-white rounded-lg shadow">
           <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Transactions</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t('dashboard.recentTransactions')}</h2>
           </div>
           <div className="p-4">
             {!recentTransactions || recentTransactions.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No recent transactions</p>
+              <p className="text-gray-500 text-center py-4">{t('dashboard.noRecentTransactions')}</p>
             ) : (
               <div className="space-y-3">
                 {recentTransactions.map((transaction) => (
@@ -160,7 +162,7 @@ export default function Dashboard() {
               to="/transactions"
               className="block text-center text-primary-600 hover:text-primary-700 text-sm font-medium mt-4"
             >
-              View all transactions →
+              {`${t('dashboard.viewAllTransactions')} \u2192`}
             </Link>
           </div>
         </div>
@@ -168,11 +170,11 @@ export default function Dashboard() {
         {/* Low Stock Alerts */}
         <div className="bg-white rounded-lg shadow">
           <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Low Stock Alerts</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t('dashboard.lowStockAlerts')}</h2>
           </div>
           <div className="p-4">
             {!lowStockItems || lowStockItems.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">All stock levels are good</p>
+              <p className="text-gray-500 text-center py-4">{t('dashboard.allStockGood')}</p>
             ) : (
               <div className="space-y-3">
                 {lowStockItems.map((material) => (
@@ -200,7 +202,7 @@ export default function Dashboard() {
               to="/inventory"
               className="block text-center text-primary-600 hover:text-primary-700 text-sm font-medium mt-4"
             >
-              View inventory →
+              {`${t('dashboard.viewInventory')} \u2192`}
             </Link>
           </div>
         </div>

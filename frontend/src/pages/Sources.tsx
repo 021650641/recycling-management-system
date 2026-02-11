@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { apartmentsAPI } from '@/lib/api';
 import { Plus, Edit2, Trash2, Save, X, Search, Home, ChevronRight, ArrowLeft, Users, Weight } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -29,6 +30,7 @@ interface ApartmentUnit {
 }
 
 export default function Sources() {
+  const { t } = useTranslation();
   const [apartments, setApartments] = useState<ApartmentComplex[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingItem, setEditingItem] = useState<ApartmentComplex | null>(null);
@@ -52,7 +54,7 @@ export default function Sources() {
       setApartments(data);
     } catch (error) {
       console.error('Failed to load sources:', error);
-      toast.error('Failed to load sources');
+      toast.error(t('sources.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -67,27 +69,27 @@ export default function Sources() {
     try {
       if (editingItem) {
         await apartmentsAPI.update(editingItem.id, data);
-        toast.success('Source updated');
+        toast.success(t('sources.updated'));
       } else {
         await apartmentsAPI.create(data);
-        toast.success('Source created');
+        toast.success(t('sources.created'));
       }
       setShowForm(false);
       setEditingItem(null);
       loadData(searchQuery);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save source');
+      toast.error(error.response?.data?.message || t('sources.failedToSave'));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to deactivate this source?')) return;
+    if (!confirm(t('sources.confirmDeactivate'))) return;
     try {
       await apartmentsAPI.delete(id);
-      toast.success('Source deactivated');
+      toast.success(t('sources.deactivated'));
       loadData(searchQuery);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to delete source');
+      toast.error(error.response?.data?.message || t('sources.failedToDelete'));
     }
   };
 
@@ -107,8 +109,8 @@ export default function Sources() {
         <div className="flex items-center gap-3">
           <Home className="w-7 h-7 text-primary-600" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Sources</h1>
-            <p className="text-sm text-gray-500">Apartment complexes and buildings that generate waste</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('sources.title')}</h1>
+            <p className="text-sm text-gray-500">{t('sources.subtitle')}</p>
           </div>
         </div>
         <button
@@ -116,7 +118,7 @@ export default function Sources() {
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
         >
           <Plus className="w-4 h-4" />
-          Add Source
+          {t('sources.add')}
         </button>
       </div>
 
@@ -128,13 +130,13 @@ export default function Sources() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name or address..."
+              placeholder={t('sources.searchPlaceholder')}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             />
           </div>
           <button type="submit" className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">
             <Search className="w-4 h-4" />
-            Search
+            {t('common.search')}
           </button>
         </div>
       </form>
@@ -148,26 +150,26 @@ export default function Sources() {
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading sources...</div>
+        <div className="text-center py-12 text-gray-500">{t('sources.loading')}</div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Units</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.name')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.address')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('sources.units')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('sources.contact')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.phone')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.status')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {apartments.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">No sources found</td>
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">{t('sources.noResults')}</td>
                   </tr>
                 ) : (
                   apartments.map((apt) => (
@@ -189,15 +191,15 @@ export default function Sources() {
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
                           apt.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                         }`}>
-                          {apt.is_active ? 'Active' : 'Inactive'}
+                          {apt.is_active ? t('common.active') : t('common.inactive')}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
-                          <button onClick={() => { setEditingItem(apt); setShowForm(true); }} className="text-blue-600 hover:text-blue-800" title="Edit">
+                          <button onClick={() => { setEditingItem(apt); setShowForm(true); }} className="text-blue-600 hover:text-blue-800" title={t('common.edit')}>
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button onClick={() => handleDelete(apt.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                          <button onClick={() => handleDelete(apt.id)} className="text-red-600 hover:text-red-800" title={t('common.delete')}>
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -217,6 +219,7 @@ export default function Sources() {
 // ─── Units List (drill-down view for a complex) ───
 
 function UnitsList({ complex, onBack }: { complex: ApartmentComplex; onBack: () => void }) {
+  const { t } = useTranslation();
   const [units, setUnits] = useState<ApartmentUnit[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -234,7 +237,7 @@ function UnitsList({ complex, onBack }: { complex: ApartmentComplex; onBack: () 
       setUnits(response.data?.units || []);
     } catch (error) {
       console.error('Failed to load units:', error);
-      toast.error('Failed to load units');
+      toast.error(t('sources.failedToLoadUnits'));
     } finally {
       setLoading(false);
     }
@@ -244,27 +247,27 @@ function UnitsList({ complex, onBack }: { complex: ApartmentComplex; onBack: () 
     try {
       if (editingUnit) {
         await apartmentsAPI.updateUnit(complex.id, editingUnit.id, data);
-        toast.success('Unit updated');
+        toast.success(t('sources.unitUpdated'));
       } else {
         await apartmentsAPI.createUnit(complex.id, data);
-        toast.success('Unit created');
+        toast.success(t('sources.unitCreated'));
       }
       setShowForm(false);
       setEditingUnit(null);
       loadUnits();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to save unit');
+      toast.error(error.response?.data?.error || t('sources.failedToSaveUnit'));
     }
   };
 
   const handleDeleteUnit = async (unitId: string) => {
-    if (!confirm('Are you sure you want to deactivate this unit?')) return;
+    if (!confirm(t('sources.confirmDeactivateUnit'))) return;
     try {
       await apartmentsAPI.deleteUnit(complex.id, unitId);
-      toast.success('Unit deactivated');
+      toast.success(t('sources.unitDeactivated'));
       loadUnits();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to delete unit');
+      toast.error(error.response?.data?.error || t('sources.failedToDeleteUnit'));
     }
   };
 
@@ -278,11 +281,11 @@ function UnitsList({ complex, onBack }: { complex: ApartmentComplex; onBack: () 
     }
     try {
       const result = await apartmentsAPI.bulkCreateUnits(complex.id, unitsList);
-      toast.success(`Created ${result.data?.created || 0} units`);
+      toast.success(t('sources.bulkCreated', { count: result.data?.created || 0 }));
       setShowBulkForm(false);
       loadUnits();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to create units');
+      toast.error(error.response?.data?.error || t('sources.failedToCreateUnits'));
     }
   };
 
@@ -296,14 +299,14 @@ function UnitsList({ complex, onBack }: { complex: ApartmentComplex; onBack: () 
       <div>
         <button onClick={onBack} className="flex items-center text-gray-600 hover:text-gray-900 mb-3">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Sources
+          {t('sources.backToSources')}
         </button>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Home className="w-7 h-7 text-primary-600" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{complex.name}</h1>
-              <p className="text-sm text-gray-500">{complex.address || 'No address'}</p>
+              <p className="text-sm text-gray-500">{complex.address || t('sources.noAddress')}</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -312,14 +315,14 @@ function UnitsList({ complex, onBack }: { complex: ApartmentComplex; onBack: () 
               className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg"
             >
               <Users className="w-4 h-4" />
-              Bulk Add
+              {t('sources.bulkAdd')}
             </button>
             <button
               onClick={() => { setEditingUnit(null); setShowForm(true); }}
               className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
             >
               <Plus className="w-4 h-4" />
-              Add Unit
+              {t('sources.addUnit')}
             </button>
           </div>
         </div>
@@ -328,15 +331,15 @@ function UnitsList({ complex, onBack }: { complex: ApartmentComplex; onBack: () 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500">Active Units</p>
+          <p className="text-sm text-gray-500">{t('sources.activeUnits')}</p>
           <p className="text-2xl font-bold text-gray-900">{activeUnits.length}</p>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500">Total Transactions</p>
+          <p className="text-sm text-gray-500">{t('sources.totalTransactions')}</p>
           <p className="text-2xl font-bold text-gray-900">{totalTransactions}</p>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500">Total Weight Collected</p>
+          <p className="text-sm text-gray-500">{t('sources.totalWeightCollected')}</p>
           <p className="text-2xl font-bold text-gray-900">{totalWeight.toFixed(2)} kg</p>
         </div>
       </div>
@@ -358,28 +361,28 @@ function UnitsList({ complex, onBack }: { complex: ApartmentComplex; onBack: () 
 
       {/* Units Table */}
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading units...</div>
+        <div className="text-center py-12 text-gray-500">{t('sources.loadingUnits')}</div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit #</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Floor</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Resident</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Transactions</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Weight</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('sources.unitNumber')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('sources.floor')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('sources.residentName')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.phone')}</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('sources.transactions')}</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('sources.totalWeight')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.status')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {units.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                      No units registered yet. Add individual units or use Bulk Add to create multiple at once.
+                      {t('sources.noUnits')}
                     </td>
                   </tr>
                 ) : (
@@ -400,15 +403,15 @@ function UnitsList({ complex, onBack }: { complex: ApartmentComplex; onBack: () 
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
                           unit.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                         }`}>
-                          {unit.is_active ? 'Active' : 'Inactive'}
+                          {unit.is_active ? t('common.active') : t('common.inactive')}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
-                          <button onClick={() => { setEditingUnit(unit); setShowForm(true); }} className="text-blue-600 hover:text-blue-800" title="Edit">
+                          <button onClick={() => { setEditingUnit(unit); setShowForm(true); }} className="text-blue-600 hover:text-blue-800" title={t('common.edit')}>
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button onClick={() => handleDeleteUnit(unit.id)} className="text-red-600 hover:text-red-800" title="Deactivate">
+                          <button onClick={() => handleDeleteUnit(unit.id)} className="text-red-600 hover:text-red-800" title={t('common.deactivate')}>
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -428,6 +431,7 @@ function UnitsList({ complex, onBack }: { complex: ApartmentComplex; onBack: () 
 // ─── Forms ───
 
 function SourceForm({ item, onSave, onCancel }: { item: ApartmentComplex | null; onSave: (data: any) => void; onCancel: () => void }) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: item?.name || '',
     address: item?.address || '',
@@ -447,39 +451,39 @@ function SourceForm({ item, onSave, onCancel }: { item: ApartmentComplex | null;
 
   return (
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
-      <h2 className="text-lg font-semibold text-gray-900">{item ? 'Edit Source' : 'Add Source'}</h2>
+      <h2 className="text-lg font-semibold text-gray-900">{item ? t('sources.editSource') : t('sources.add')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.name')} *</label>
           <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.address')}</label>
           <input type="text" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Total Units</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sources.totalUnitsLabel')}</label>
           <input type="number" value={formData.totalUnits} onChange={(e) => setFormData({ ...formData, totalUnits: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Contact Name</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sources.contactName')}</label>
           <input type="text" value={formData.contactName} onChange={(e) => setFormData({ ...formData, contactName: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Contact Phone</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sources.contactPhone')}</label>
           <input type="tel" value={formData.contactPhone} onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Contact Email</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sources.contactEmail')}</label>
           <input type="email" value={formData.contactEmail} onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
       </div>
       <div className="flex gap-2 pt-2">
         <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
-          <Save className="w-4 h-4" /> Save
+          <Save className="w-4 h-4" /> {t('common.save')}
         </button>
         <button type="button" onClick={onCancel} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
-          <X className="w-4 h-4" /> Cancel
+          <X className="w-4 h-4" /> {t('common.cancel')}
         </button>
       </div>
     </form>
@@ -487,6 +491,7 @@ function SourceForm({ item, onSave, onCancel }: { item: ApartmentComplex | null;
 }
 
 function UnitForm({ item, onSave, onCancel }: { item: ApartmentUnit | null; onSave: (data: any) => void; onCancel: () => void }) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     unitNumber: item?.unit_number || '',
     residentName: item?.resident_name || '',
@@ -503,39 +508,39 @@ function UnitForm({ item, onSave, onCancel }: { item: ApartmentUnit | null; onSa
 
   return (
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
-      <h2 className="text-lg font-semibold text-gray-900">{item ? 'Edit Unit' : 'Add Unit'}</h2>
+      <h2 className="text-lg font-semibold text-gray-900">{item ? t('sources.editUnit') : t('sources.addUnit')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Unit Number *</label>
-          <input type="text" value={formData.unitNumber} onChange={(e) => setFormData({ ...formData, unitNumber: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required placeholder="e.g. 101, 4B" />
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sources.unitNumber')} *</label>
+          <input type="text" value={formData.unitNumber} onChange={(e) => setFormData({ ...formData, unitNumber: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required placeholder={t('sources.unitNumberPlaceholder')} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Floor</label>
-          <input type="text" value={formData.floor} onChange={(e) => setFormData({ ...formData, floor: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="e.g. 1, Ground" />
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sources.floor')}</label>
+          <input type="text" value={formData.floor} onChange={(e) => setFormData({ ...formData, floor: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder={t('sources.floorPlaceholder')} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Resident Name</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sources.residentName')}</label>
           <input type="text" value={formData.residentName} onChange={(e) => setFormData({ ...formData, residentName: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sources.residentPhone')}</label>
           <input type="tel" value={formData.residentPhone} onChange={(e) => setFormData({ ...formData, residentPhone: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.email')}</label>
           <input type="email" value={formData.residentEmail} onChange={(e) => setFormData({ ...formData, residentEmail: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.notes')}</label>
           <input type="text" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
       </div>
       <div className="flex gap-2 pt-2">
         <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
-          <Save className="w-4 h-4" /> Save
+          <Save className="w-4 h-4" /> {t('common.save')}
         </button>
         <button type="button" onClick={onCancel} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
-          <X className="w-4 h-4" /> Cancel
+          <X className="w-4 h-4" /> {t('common.cancel')}
         </button>
       </div>
     </form>
@@ -543,6 +548,7 @@ function UnitForm({ item, onSave, onCancel }: { item: ApartmentUnit | null; onSa
 }
 
 function BulkUnitForm({ onSave, onCancel }: { onSave: (startNum: number, endNum: number, prefix: string, floor: string) => void; onCancel: () => void }) {
+  const { t } = useTranslation();
   const [startNum, setStartNum] = useState('1');
   const [endNum, setEndNum] = useState('');
   const [prefix, setPrefix] = useState('');
@@ -553,11 +559,11 @@ function BulkUnitForm({ onSave, onCancel }: { onSave: (startNum: number, endNum:
     const start = parseInt(startNum);
     const end = parseInt(endNum);
     if (isNaN(start) || isNaN(end) || end < start) {
-      toast.error('Invalid range');
+      toast.error(t('sources.invalidRange'));
       return;
     }
     if (end - start > 500) {
-      toast.error('Maximum 500 units at a time');
+      toast.error(t('sources.maxUnits'));
       return;
     }
     onSave(start, end, prefix, floor);
@@ -565,38 +571,38 @@ function BulkUnitForm({ onSave, onCancel }: { onSave: (startNum: number, endNum:
 
   return (
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
-      <h2 className="text-lg font-semibold text-gray-900">Bulk Add Units</h2>
-      <p className="text-sm text-gray-500">Generate numbered units. For example: start=1, end=150, prefix="Apt " creates Apt 1, Apt 2, ... Apt 150</p>
+      <h2 className="text-lg font-semibold text-gray-900">{t('sources.bulkAddUnits')}</h2>
+      <p className="text-sm text-gray-500">{t('sources.bulkAddDescription')}</p>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Start Number *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sources.startNumber')} *</label>
           <input type="number" value={startNum} onChange={(e) => setStartNum(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required min="1" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">End Number *</label>
-          <input type="number" value={endNum} onChange={(e) => setEndNum(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required min="1" placeholder="e.g. 150" />
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sources.endNumber')} *</label>
+          <input type="number" value={endNum} onChange={(e) => setEndNum(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required min="1" placeholder={t('sources.endNumberPlaceholder')} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Prefix (optional)</label>
-          <input type="text" value={prefix} onChange={(e) => setPrefix(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder='e.g. "Apt "' />
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sources.prefix')}</label>
+          <input type="text" value={prefix} onChange={(e) => setPrefix(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder={t('sources.prefixPlaceholder')} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Floor (optional)</label>
-          <input type="text" value={floor} onChange={(e) => setFloor(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="e.g. Ground" />
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sources.floorOptional')}</label>
+          <input type="text" value={floor} onChange={(e) => setFloor(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder={t('sources.floorPlaceholder')} />
         </div>
       </div>
       {startNum && endNum && (
         <p className="text-sm text-gray-600">
-          Will create {Math.max(0, parseInt(endNum) - parseInt(startNum) + 1)} units:
+          {t('sources.willCreate', { count: Math.max(0, parseInt(endNum) - parseInt(startNum) + 1) })}:
           {' '}{prefix}{startNum}, {prefix}{parseInt(startNum) + 1}, ... {prefix}{endNum}
         </p>
       )}
       <div className="flex gap-2 pt-2">
         <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
-          <Plus className="w-4 h-4" /> Create Units
+          <Plus className="w-4 h-4" /> {t('sources.createUnits')}
         </button>
         <button type="button" onClick={onCancel} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
-          <X className="w-4 h-4" /> Cancel
+          <X className="w-4 h-4" /> {t('common.cancel')}
         </button>
       </div>
     </form>

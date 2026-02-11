@@ -21,6 +21,7 @@ import Clients from '@/pages/Clients';
 import Sources from '@/pages/Sources';
 import SalesPage from '@/pages/Sales';
 import Traceability from '@/pages/Traceability';
+import Help from '@/pages/Help';
 
 // Protected Route Component
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
@@ -79,6 +80,7 @@ function App() {
           <Route path="clients" element={<Clients />} />
           <Route path="sources" element={<Sources />} />
           <Route path="sales" element={<SalesPage />} />
+          <Route path="help" element={<Help />} />
           <Route
             path="traceability"
             element={

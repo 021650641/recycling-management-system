@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { transactionsAPI, materialsAPI, locationsAPI, wastePickersAPI, apartmentsAPI, api } from '@/lib/api';
 import { db } from '@/lib/db';
 import { useAuthStore } from '@/store/authStore';
@@ -8,6 +9,7 @@ import { Save, ArrowLeft } from 'lucide-react';
 
 export default function NewTransaction() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -196,13 +198,13 @@ export default function NewTransaction() {
           className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Transactions
+          {t('transactions.backToTransactions')}
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">New Transaction</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('transactions.new')}</h1>
         {!isOnline && (
           <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-sm text-yellow-800">
-              You are offline. Transaction will be saved locally and synced when connection is restored.
+              {t('transactions.offlineMessage')}
             </p>
           </div>
         )}
@@ -212,7 +214,7 @@ export default function NewTransaction() {
         {/* Waste Picker (Vendor) - Always Required */}
         <div>
           <label htmlFor="wastePickerId" className="block text-sm font-medium text-gray-700 mb-2">
-            Waste Picker (Vendor) *
+            {t('transactions.wastePicker')} *
           </label>
           <select
             id="wastePickerId"
@@ -222,7 +224,7 @@ export default function NewTransaction() {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
             required
           >
-            <option value="">Select waste picker</option>
+            <option value="">{t('transactions.selectWastePicker')}</option>
             {wastePickers.map((wp) => (
               <option key={wp.id} value={wp.id}>
                 {wp.first_name} {wp.last_name}
@@ -235,12 +237,12 @@ export default function NewTransaction() {
         {/* Source (Optional) - Where the material came from */}
         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Source Origin (optional - where did the material come from?)
+            {t('transactions.sourceOriginDesc')}
           </label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="apartmentComplexId" className="block text-xs text-gray-500 mb-1">
-                Apartment Complex
+                {t('transactions.apartmentComplex')}
               </label>
               <select
                 id="apartmentComplexId"
@@ -249,7 +251,7 @@ export default function NewTransaction() {
                 onChange={(e) => setFormData(prev => ({ ...prev, apartmentComplexId: e.target.value, apartmentUnitId: '' }))}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none bg-white"
               >
-                <option value="">No source / Unknown</option>
+                <option value="">{t('transactions.noSource')}</option>
                 {apartments.map((apt) => (
                   <option key={apt.id} value={apt.id}>
                     {apt.name}
@@ -260,7 +262,7 @@ export default function NewTransaction() {
             </div>
             <div>
               <label htmlFor="apartmentUnitId" className="block text-xs text-gray-500 mb-1">
-                Specific Unit {loadingUnits && '(loading...)'}
+                {t('transactions.specificUnit')} {loadingUnits && `(${t('common.loading')})`}
               </label>
               <select
                 id="apartmentUnitId"
@@ -270,7 +272,7 @@ export default function NewTransaction() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none bg-white"
                 disabled={!formData.apartmentComplexId || loadingUnits}
               >
-                <option value="">Any / Unknown unit</option>
+                <option value="">{t('transactions.anyUnit')}</option>
                 {units.filter(u => u.is_active).map((unit) => (
                   <option key={unit.id} value={unit.id}>
                     Unit {unit.unit_number}
@@ -286,7 +288,7 @@ export default function NewTransaction() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="materialId" className="block text-sm font-medium text-gray-700 mb-2">
-              Material *
+              {t('transactions.material')} *
             </label>
             <select
               id="materialId"
@@ -296,7 +298,7 @@ export default function NewTransaction() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
               required
             >
-              <option value="">Select material</option>
+              <option value="">{t('transactions.selectMaterial')}</option>
               {materials.map((material) => (
                 <option key={material.id} value={material.id}>
                   {material.name}
@@ -307,7 +309,7 @@ export default function NewTransaction() {
 
           <div>
             <label htmlFor="locationId" className="block text-sm font-medium text-gray-700 mb-2">
-              Drop-off Location *
+              {t('transactions.dropOffLocation')} *
             </label>
             <select
               id="locationId"
@@ -317,7 +319,7 @@ export default function NewTransaction() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
               required
             >
-              <option value="">Select location</option>
+              <option value="">{t('transactions.selectLocation')}</option>
               {locations.map((location) => (
                 <option key={location.id} value={location.id}>
                   {location.name}
@@ -331,7 +333,7 @@ export default function NewTransaction() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-2">
-              Weight (kg) *
+              {t('transactions.weightKg')} *
             </label>
             <input
               id="quantity"
@@ -348,7 +350,7 @@ export default function NewTransaction() {
 
           <div>
             <label htmlFor="unitPrice" className="block text-sm font-medium text-gray-700 mb-2">
-              Unit Price (auto-filled)
+              {t('transactions.unitPriceAutoFill')}
             </label>
             <input
               id="unitPrice"
@@ -365,7 +367,7 @@ export default function NewTransaction() {
 
           <div>
             <label htmlFor="qualityGrade" className="block text-sm font-medium text-gray-700 mb-2">
-              Quality Grade
+              {t('transactions.qualityGrade')}
             </label>
             <select
               id="qualityGrade"
@@ -374,15 +376,15 @@ export default function NewTransaction() {
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
             >
-              <option value="standard">Standard</option>
-              <option value="premium">Premium</option>
-              <option value="low">Low</option>
+              <option value="standard">{t('transactions.standard')}</option>
+              <option value="premium">{t('transactions.premium')}</option>
+              <option value="low">{t('transactions.low')}</option>
             </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Total Amount
+              {t('transactions.totalAmount')}
             </label>
             <div className="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg font-semibold text-lg">
               ${calculateTotal()}
@@ -394,7 +396,7 @@ export default function NewTransaction() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-700 mb-2">
-              Payment Method
+              {t('transactions.paymentMethod')}
             </label>
             <select
               id="paymentMethod"
@@ -403,15 +405,15 @@ export default function NewTransaction() {
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
             >
-              <option value="cash">Cash</option>
-              <option value="bank_transfer">Bank Transfer</option>
-              <option value="mobile_money">Mobile Money</option>
+              <option value="cash">{t('transactions.cash')}</option>
+              <option value="bank_transfer">{t('transactions.bankTransfer')}</option>
+              <option value="mobile_money">{t('transactions.mobileMoney')}</option>
             </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Payment Status *
+              {t('transactions.paymentStatus')} *
             </label>
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -423,7 +425,7 @@ export default function NewTransaction() {
                     : 'border-gray-300 hover:border-gray-400'
                 }`}
               >
-                Paid
+                {t('transactions.paid')}
               </button>
               <button
                 type="button"
@@ -434,7 +436,7 @@ export default function NewTransaction() {
                     : 'border-gray-300 hover:border-gray-400'
                 }`}
               >
-                Partial
+                {t('transactions.partial')}
               </button>
               <button
                 type="button"
@@ -445,7 +447,7 @@ export default function NewTransaction() {
                     : 'border-gray-300 hover:border-gray-400'
                 }`}
               >
-                Pending
+                {t('transactions.pending')}
               </button>
             </div>
           </div>
@@ -454,7 +456,7 @@ export default function NewTransaction() {
         {formData.paymentStatus === 'partial' && (
           <div>
             <label htmlFor="paidAmount" className="block text-sm font-medium text-gray-700 mb-2">
-              Paid Amount ($)
+              {t('transactions.paidAmount')}
             </label>
             <input
               id="paidAmount"
@@ -473,7 +475,7 @@ export default function NewTransaction() {
         {/* Notes */}
         <div>
           <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
-            Notes
+            {t('common.notes')}
           </label>
           <textarea
             id="notes"
@@ -493,7 +495,7 @@ export default function NewTransaction() {
             onClick={() => navigate('/transactions')}
             className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
@@ -501,7 +503,7 @@ export default function NewTransaction() {
             className="flex-1 flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-5 h-5" />
-            {isSubmitting ? 'Saving...' : 'Save Transaction'}
+            {isSubmitting ? `${t('common.loading')}` : t('transactions.saveTransaction')}
           </button>
         </div>
       </form>

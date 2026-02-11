@@ -119,7 +119,7 @@ export default function Reports() {
     { key: 'purchases', label: t('reports.purchases'), icon: Users },
     { key: 'sales', label: t('reports.salesReport'), icon: ShoppingCart },
     { key: 'traceability', label: t('reports.traceabilityReport'), icon: GitBranch },
-    { key: 'analysis', label: 'Analysis', icon: BarChart3 },
+    { key: 'analysis', label: t('reports.analysis'), icon: BarChart3 },
   ];
 
   return (
@@ -131,7 +131,7 @@ export default function Reports() {
             disabled={loading}
             className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50">
             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-            {t('common.refresh') || 'Refresh'}
+            {t('common.refresh')}
           </button>
           <div className="relative" ref={exportRef}>
             <button onClick={() => setShowExportMenu(!showExportMenu)}
@@ -362,7 +362,7 @@ function PurchasesTab({ data, groupBy, setGroupBy, t, dfmt }: any) {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('transactions.material')}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('reports.purchasesReport.totalWeight')}</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg $/kg</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('reports.avgPerKg')}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('reports.purchasesReport.totalCost')}</th>
               </>}
               {groupBy === 'detailed' && <>
@@ -439,7 +439,7 @@ function SalesTab({ data, groupBy, setGroupBy, t, dfmt }: any) {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('transactions.material')}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('reports.salesReportSection.totalWeight')}</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg $/kg</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('reports.avgPerKg')}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('reports.salesReportSection.revenue')}</th>
               </>}
               {groupBy === 'detailed' && <>
@@ -519,7 +519,7 @@ function TraceabilityTab({ dateRange, refreshKey, t, dfmt }: any) {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('reports.source')}</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('transactions.material')}</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">kg</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
@@ -549,7 +549,7 @@ function TraceabilityTab({ dateRange, refreshKey, t, dfmt }: any) {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.date')}</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('reports.source')}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('transactions.wastePicker')}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('transactions.material')}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">kg</th>
@@ -588,16 +588,16 @@ function AnalysisTab({ dateRange, refreshKey, t, onStateChange }: any) {
   const [loading, setLoading] = useState(false);
 
   const purchaseGroups: { key: AggGroupBy; label: string }[] = [
-    { key: 'vendor', label: 'By Vendor' },
-    { key: 'source', label: 'By Source' },
-    { key: 'unit', label: 'By Unit' },
-    { key: 'material', label: 'By Material' },
-    { key: 'location', label: 'By Location' },
+    { key: 'vendor', label: t('reports.byVendor') },
+    { key: 'source', label: t('reports.bySource') },
+    { key: 'unit', label: t('reports.byUnit') },
+    { key: 'material', label: t('reports.byMaterial') },
+    { key: 'location', label: t('reports.byLocation') },
   ];
   const salesGroups: { key: AggGroupBy; label: string }[] = [
-    { key: 'client', label: 'By Client' },
-    { key: 'material', label: 'By Material' },
-    { key: 'location', label: 'By Location' },
+    { key: 'client', label: t('reports.byClient') },
+    { key: 'material', label: t('reports.byMaterial') },
+    { key: 'location', label: t('reports.byLocation') },
   ];
 
   const groupOptions = dataType === 'sales' ? salesGroups : purchaseGroups;
@@ -639,10 +639,18 @@ function AnalysisTab({ dateRange, refreshKey, t, onStateChange }: any) {
   }
 
   const subGroupLabel = groupBy === 'material'
-    ? (dataType === 'sales' ? 'Client' : 'Vendor')
-    : 'Material';
-  const valueLabel = dataType === 'sales' ? 'Revenue' : 'Cost';
-  const groupLabel = groupBy.charAt(0).toUpperCase() + groupBy.slice(1);
+    ? (dataType === 'sales' ? t('reports.salesReportSection.client') : t('reports.purchasesReport.vendor'))
+    : t('common.material');
+  const valueLabel = dataType === 'sales' ? t('reports.revenue') : t('reports.cost');
+  const groupLabelMap: Record<string, string> = {
+    vendor: t('reports.purchasesReport.vendor'),
+    source: t('reports.source'),
+    unit: t('common.unit'),
+    material: t('common.material'),
+    location: t('common.location'),
+    client: t('reports.salesReportSection.client'),
+  };
+  const groupLabel = groupLabelMap[groupBy] || groupBy;
 
   // Grand totals
   const grandWeight = data.reduce((s, r) => s + parseFloat(r.total_weight_kg || 0), 0);
@@ -653,14 +661,14 @@ function AnalysisTab({ dateRange, refreshKey, t, onStateChange }: any) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Data</label>
+          <label className="block text-xs text-gray-500 mb-1">{t('reports.data')}</label>
           <GroupToggle value={dataType} onChange={(v: any) => setDataType(v)} options={[
             { key: 'purchases', label: t('reports.purchases') },
             { key: 'sales', label: t('reports.salesReport') },
           ]} />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Group by</label>
+          <label className="block text-xs text-gray-500 mb-1">{t('reports.groupBy')}</label>
           <GroupToggle value={groupBy} onChange={(v: any) => setGroupBy(v)} options={groupOptions} />
         </div>
       </div>
@@ -675,12 +683,12 @@ function AnalysisTab({ dateRange, refreshKey, t, onStateChange }: any) {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{groupLabel}</th>
-                {groupBy === 'unit' && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Resident</th>}
+                {groupBy === 'unit' && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('reports.resident')}</th>}
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{subGroupLabel}</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">#</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Weight (kg)</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('reports.weightKg')}</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{valueLabel}</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Avg $/kg</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('reports.avgPerKg')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -705,7 +713,7 @@ function AnalysisTab({ dateRange, refreshKey, t, onStateChange }: any) {
                   ))}
                   {rows.length > 1 && (
                     <tr key={`${groupName}-total`} className="bg-gray-50">
-                      <td className="px-4 py-2 text-sm font-bold text-gray-700">{groupName} Total</td>
+                      <td className="px-4 py-2 text-sm font-bold text-gray-700">{groupName} {t('common.total')}</td>
                       {groupBy === 'unit' && <td />}
                       <td />
                       <td className="px-4 py-2 text-sm text-right font-bold">{grpCount}</td>
@@ -720,9 +728,9 @@ function AnalysisTab({ dateRange, refreshKey, t, onStateChange }: any) {
             </tbody>
             <tfoot className="border-t-2 border-gray-300">
               <tr className="bg-gray-100 font-bold">
-                <td className="px-4 py-3 text-sm">Grand Total</td>
+                <td className="px-4 py-3 text-sm">{t('reports.grandTotal')}</td>
                 {groupBy === 'unit' && <td />}
-                <td className="px-4 py-3 text-sm text-gray-500">{Object.keys(groups).length} {groupLabel.toLowerCase()}s</td>
+                <td className="px-4 py-3 text-sm text-gray-500">{Object.keys(groups).length} {groupLabel}</td>
                 <td className="px-4 py-3 text-sm text-right">{grandCount}</td>
                 <td className="px-4 py-3 text-sm text-right">{grandWeight.toFixed(2)}</td>
                 <td className="px-4 py-3 text-sm text-right">${grandValue.toFixed(2)}</td>

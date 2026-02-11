@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { materialsAPI, locationsAPI, settingsAPI, pricesAPI } from '@/lib/api';
 import { api } from '@/lib/api';
 import { Plus, Edit2, Trash2, Save, X, Mail, Settings, Clock, Calendar } from 'lucide-react';
@@ -9,6 +10,7 @@ import { formatDate } from '@/lib/dateFormat';
 type TabType = 'materials' | 'locations' | 'pricing' | 'email' | 'display';
 
 export default function AdminPanel() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabType>('materials');
   const [materials, setMaterials] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
@@ -47,7 +49,7 @@ export default function AdminPanel() {
       }
     } catch (error) {
       console.error('Failed to load data:', error);
-      toast.error('Failed to load data');
+      toast.error(t('common.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -58,52 +60,52 @@ export default function AdminPanel() {
       if (activeTab === 'materials') {
         if (editingItem) {
           await materialsAPI.update(editingItem.id, data);
-          toast.success('Material updated');
+          toast.success(t('admin.materialUpdated'));
         } else {
           await materialsAPI.create(data);
-          toast.success('Material created');
+          toast.success(t('admin.materialCreated'));
         }
       } else if (activeTab === 'locations') {
         if (editingItem) {
           await locationsAPI.update(editingItem.id, data);
-          toast.success('Location updated');
+          toast.success(t('admin.locationUpdated'));
         } else {
           await locationsAPI.create(data);
-          toast.success('Location created');
+          toast.success(t('admin.locationCreated'));
         }
       } else if (activeTab === 'pricing') {
         await api.post('/materials/prices', data);
-        toast.success(editingItem ? 'Price updated' : 'Price created');
+        toast.success(editingItem ? t('admin.priceUpdated') : t('admin.priceCreated'));
       }
       setShowForm(false);
       setEditingItem(null);
       loadData();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save');
+      toast.error(error.response?.data?.message || t('common.failedToSave'));
     }
   };
 
   const handleDelete = async (id: number | string) => {
-    if (!confirm('Are you sure you want to delete this item?')) return;
+    if (!confirm(t('common.confirmDelete'))) return;
 
     try {
       if (activeTab === 'materials') {
         await materialsAPI.delete(id as number);
-        toast.success('Material deleted');
+        toast.success(t('admin.materialDeleted'));
       } else if (activeTab === 'locations') {
         await locationsAPI.delete(id as number);
-        toast.success('Location deleted');
+        toast.success(t('admin.locationDeleted'));
       }
       loadData();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to delete');
+      toast.error(error.response?.data?.message || t('common.failedToDelete'));
     }
   };
 
   const renderMaterialsTab = () => (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-900">Materials Management</h2>
+        <h2 className="text-xl font-semibold text-gray-900">{t('admin.materialsManagement')}</h2>
         <button
           onClick={() => {
             setEditingItem(null);
@@ -112,7 +114,7 @@ export default function AdminPanel() {
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
         >
           <Plus className="w-4 h-4" />
-          Add Material
+          {t('admin.addMaterial')}
         </button>
       </div>
 
@@ -122,11 +124,11 @@ export default function AdminPanel() {
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.name')}</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.description')}</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.unit')}</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.status')}</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -137,7 +139,7 @@ export default function AdminPanel() {
                 <td className="px-4 py-3 text-sm text-gray-900">{material.unit}</td>
                 <td className="px-4 py-3">
                   <span className={`px-2 py-1 text-xs rounded-full ${material.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {material.is_active ? 'Active' : 'Inactive'}
+                    {material.is_active ? t('common.active') : t('common.inactive')}
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -161,7 +163,7 @@ export default function AdminPanel() {
   const renderLocationsTab = () => (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-900">Locations Management</h2>
+        <h2 className="text-xl font-semibold text-gray-900">{t('admin.locationsManagement')}</h2>
         <button
           onClick={() => {
             setEditingItem(null);
@@ -170,7 +172,7 @@ export default function AdminPanel() {
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
         >
           <Plus className="w-4 h-4" />
-          Add Location
+          {t('admin.addLocation')}
         </button>
       </div>
 
@@ -180,11 +182,11 @@ export default function AdminPanel() {
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Manager</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.name')}</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.address')}</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('admin.managerName')}</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.status')}</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -195,7 +197,7 @@ export default function AdminPanel() {
                 <td className="px-4 py-3 text-sm text-gray-900">{location.manager_name || '-'}</td>
                 <td className="px-4 py-3">
                   <span className={`px-2 py-1 text-xs rounded-full ${location.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {location.is_active ? 'Active' : 'Inactive'}
+                    {location.is_active ? t('common.active') : t('common.inactive')}
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -218,7 +220,7 @@ export default function AdminPanel() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
+      <h1 className="text-2xl font-bold text-gray-900">{t('admin.title')}</h1>
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
@@ -231,7 +233,7 @@ export default function AdminPanel() {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            Materials
+            {t('admin.materials')}
           </button>
           <button
             onClick={() => setActiveTab('locations')}
@@ -241,7 +243,7 @@ export default function AdminPanel() {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            Locations
+            {t('admin.locations')}
           </button>
           <button
             onClick={() => setActiveTab('pricing')}
@@ -251,7 +253,7 @@ export default function AdminPanel() {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            Pricing
+            {t('admin.pricing')}
           </button>
           <button
             onClick={() => setActiveTab('email')}
@@ -262,7 +264,7 @@ export default function AdminPanel() {
             }`}
           >
             <Mail className="w-4 h-4" />
-            Email Settings
+            {t('admin.emailSettings')}
           </button>
           <button
             onClick={() => setActiveTab('display')}
@@ -273,14 +275,14 @@ export default function AdminPanel() {
             }`}
           >
             <Settings className="w-4 h-4" />
-            Display Settings
+            {t('admin.displaySettings')}
           </button>
         </nav>
       </div>
 
       {/* Content */}
       {loading && activeTab !== 'pricing' ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>
       ) : (
         <>
           {activeTab === 'materials' && renderMaterialsTab()}
@@ -302,6 +304,7 @@ function PricingTab({ materials, locations, initialPrices, onReload, loading: pa
   onReload: () => void;
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const { dateFormat } = useSettingsStore();
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [showExpired, setShowExpired] = useState(false);
@@ -326,7 +329,7 @@ function PricingTab({ materials, locations, initialPrices, onReload, loading: pa
       setAllPrices(data);
     } catch (error: any) {
       console.error('Failed to load prices:', error);
-      toast.error('Failed to load prices. Check if the database migration has been applied.');
+      toast.error(t('admin.failedLoadPrices'));
     } finally {
       setLoadingAll(false);
     }
@@ -335,12 +338,12 @@ function PricingTab({ materials, locations, initialPrices, onReload, loading: pa
   const handleSingleSave = async (data: any) => {
     try {
       await pricesAPI.create(data);
-      toast.success('Price saved');
+      toast.success(t('admin.priceSaved'));
       setShowAddForm(false);
       loadAllPrices();
       onReload();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save price');
+      toast.error(error.response?.data?.message || t('common.failedToSave'));
     }
   };
 
@@ -370,27 +373,27 @@ function PricingTab({ materials, locations, initialPrices, onReload, loading: pa
     return time.substring(0, 5); // HH:mm
   };
 
-  if (parentLoading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
+  if (parentLoading) return <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>;
 
   return (
     <div className="space-y-4">
       {/* Header with actions */}
       <div className="flex flex-wrap justify-between items-center gap-4">
-        <h2 className="text-xl font-semibold text-gray-900">Pricing Management</h2>
+        <h2 className="text-xl font-semibold text-gray-900">{t('admin.pricingManagement')}</h2>
         <div className="flex gap-2">
           <button
             onClick={() => setShowAddForm(true)}
             className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm"
           >
             <Plus className="w-4 h-4" />
-            Add Single Price
+            {t('admin.addSinglePrice')}
           </button>
           <button
             onClick={() => setShowBulkModal(true)}
             className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm"
           >
             <Calendar className="w-4 h-4" />
-            Set Daily Prices
+            {t('admin.setDailyPrices')}
           </button>
         </div>
       </div>
@@ -424,12 +427,12 @@ function PricingTab({ materials, locations, initialPrices, onReload, loading: pa
             onChange={(e) => setShowExpired(e.target.checked)}
             className="rounded text-primary-600 focus:ring-primary-500"
           />
-          <span className="text-sm text-gray-700">Show expired prices</span>
+          <span className="text-sm text-gray-700">{t('common.showExpired')}</span>
         </label>
 
         {showExpired && (
           <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-700">Filter by date:</label>
+            <label className="text-sm text-gray-700">{t('common.filterByDate')}</label>
             <input
               type="date"
               value={filterDate}
@@ -441,7 +444,7 @@ function PricingTab({ materials, locations, initialPrices, onReload, loading: pa
                 onClick={() => setFilterDate('')}
                 className="text-xs text-gray-500 hover:text-gray-700 underline"
               >
-                Clear
+                {t('common.clear')}
               </button>
             )}
           </div>
@@ -453,19 +456,19 @@ function PricingTab({ materials, locations, initialPrices, onReload, loading: pa
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Purchase $/kg</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Sale $/kg</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Validity</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.material')}</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.location')}</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('common.purchasePerKg')}</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('common.salePerKg')}</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.date')}</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.validity')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loadingAll ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">{t('common.loading')}</td></tr>
             ) : allPrices.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No prices found</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">{t('common.noResults')}</td></tr>
             ) : (
               allPrices.map((price, index) => {
                 const today = new Date().toISOString().split('T')[0];
@@ -478,7 +481,7 @@ function PricingTab({ materials, locations, initialPrices, onReload, loading: pa
                       {price.material_name || 'Unknown'}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {price.location_id ? locations.find(l => l.id === price.location_id)?.name || '-' : 'All'}
+                      {price.location_id ? locations.find(l => l.id === price.location_id)?.name || '-' : t('common.all')}
                     </td>
                     <td className="px-4 py-3 text-sm text-right font-mono">
                       ${parseFloat(price.purchase_price_per_kg || 0).toFixed(2)}
@@ -491,7 +494,7 @@ function PricingTab({ materials, locations, initialPrices, onReload, loading: pa
                     </td>
                     <td className="px-4 py-3 text-sm">
                       {isAllDay(price.valid_from_time, price.valid_to_time) ? (
-                        <span className="text-gray-500">All day</span>
+                        <span className="text-gray-500">{t('common.allDay')}</span>
                       ) : (
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3 text-gray-400" />
@@ -517,6 +520,7 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const { dateFormat } = useSettingsStore();
   const today = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState(today);
@@ -563,7 +567,7 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
     // Filter out rows with no prices set
     const validRows = rows.filter(r => r.purchasePricePerKg && r.salePricePerKg);
     if (validRows.length === 0) {
-      toast.error('No prices to save');
+      toast.error(t('common.noResults'));
       return;
     }
 
@@ -580,10 +584,10 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
       }));
 
       await pricesAPI.bulkSave(pricesToSave);
-      toast.success(`${pricesToSave.length} prices saved for ${formatDate(selectedDate, dateFormat)}`);
+      toast.success(t('admin.pricesSaved', { count: pricesToSave.length, date: formatDate(selectedDate, dateFormat) }));
       onSaved();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save prices');
+      toast.error(error.response?.data?.message || t('common.failedToSave'));
     } finally {
       setSaving(false);
     }
@@ -604,9 +608,9 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
         {/* Modal header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Set Daily Prices</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{t('admin.setDailyPrices')}</h3>
             <p className="text-sm text-gray-500 mt-0.5">
-              Pre-populated with the latest available prices. Edit and save for the selected date.
+              {t('admin.setDailyPricesDesc')}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -617,7 +621,7 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
         {/* Date selector and time toggle */}
         <div className="px-6 py-3 border-b border-gray-100 flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Date:</label>
+            <label className="text-sm font-medium text-gray-700">{t('common.date')}:</label>
             <input
               type="date"
               value={selectedDate}
@@ -630,7 +634,7 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
               onClick={() => setAllToAllDay(true)}
               className="text-xs px-3 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
             >
-              Set all to All Day
+              {t('admin.setAllToAllDay')}
             </button>
           </div>
         </div>
@@ -646,10 +650,10 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
             </colgroup>
             <thead className="bg-gray-50 sticky top-0">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Purchase $/kg</th>
-                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Sale $/kg</th>
-                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Validity</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{t('common.material')}</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">{t('common.purchasePerKg')}</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">{t('common.salePerKg')}</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">{t('common.validity')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -689,7 +693,7 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
                           onChange={(e) => updateRow(index, 'allDay', e.target.checked)}
                           className="rounded text-primary-600 focus:ring-primary-500"
                         />
-                        All day
+                        {t('common.allDay')}
                       </label>
                       {!row.allDay && (
                         <div className="flex items-center gap-1 text-xs">
@@ -719,14 +723,14 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
         {/* Modal footer */}
         <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
           <p className="text-xs text-gray-500">
-            {rows.filter(r => r.purchasePricePerKg && r.salePricePerKg).length} of {rows.length} materials with prices set
+            {t('admin.materialsWithPrices', { count: rows.filter(r => r.purchasePricePerKg && r.salePricePerKg).length, total: rows.length })}
           </p>
           <div className="flex gap-2">
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={handleSaveAll}
@@ -734,7 +738,7 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
               className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
-              {saving ? 'Saving...' : 'Save All Prices'}
+              {saving ? t('common.loading') : t('admin.saveAllPrices')}
             </button>
           </div>
         </div>
@@ -745,6 +749,7 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
 
 // ===== Single Price Form =====
 function PriceForm({ item, materials, locations, onSave, onCancel }: any) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     materialCategoryId: item?.material_category_id || '',
     locationId: item?.location_id || '',
@@ -773,34 +778,34 @@ function PriceForm({ item, materials, locations, onSave, onCancel }: any) {
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Material *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.material')} *</label>
           <select
             value={formData.materialCategoryId}
             onChange={(e) => setFormData({ ...formData, materialCategoryId: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             required
           >
-            <option value="">Select material</option>
+            <option value="">{t('transactions.selectMaterial')}</option>
             {materials.map((m: any) => (
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Location (Optional)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.location')} ({t('common.optional')})</label>
           <select
             value={formData.locationId}
             onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
           >
-            <option value="">All locations</option>
+            <option value="">{t('common.allLocations')}</option>
             {locations.map((l: any) => (
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Purchase Price/kg *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.purchasePrice')} *</label>
           <input
             type="number"
             step="0.01"
@@ -811,7 +816,7 @@ function PriceForm({ item, materials, locations, onSave, onCancel }: any) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Sale Price/kg *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.salePrice')} *</label>
           <input
             type="number"
             step="0.01"
@@ -822,7 +827,7 @@ function PriceForm({ item, materials, locations, onSave, onCancel }: any) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Date *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.date')} *</label>
           <input
             type="date"
             value={formData.date}
@@ -832,7 +837,7 @@ function PriceForm({ item, materials, locations, onSave, onCancel }: any) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Time Validity</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.timeValidity')}</label>
           <div className="space-y-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -841,7 +846,7 @@ function PriceForm({ item, materials, locations, onSave, onCancel }: any) {
                 onChange={(e) => setFormData({ ...formData, allDay: e.target.checked })}
                 className="rounded text-primary-600 focus:ring-primary-500"
               />
-              <span className="text-sm text-gray-700">All day</span>
+              <span className="text-sm text-gray-700">{t('common.allDay')}</span>
             </label>
             {!formData.allDay && (
               <div className="flex items-center gap-2">
@@ -866,11 +871,11 @@ function PriceForm({ item, materials, locations, onSave, onCancel }: any) {
       <div className="flex gap-2">
         <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
           <Save className="w-4 h-4" />
-          Save
+          {t('common.save')}
         </button>
         <button type="button" onClick={onCancel} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
           <X className="w-4 h-4" />
-          Cancel
+          {t('common.cancel')}
         </button>
       </div>
     </form>
@@ -879,6 +884,7 @@ function PriceForm({ item, materials, locations, onSave, onCancel }: any) {
 
 // ===== Form Components =====
 function MaterialForm({ item, onSave, onCancel }: any) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: item?.name || '',
     description: item?.description || '',
@@ -895,7 +901,7 @@ function MaterialForm({ item, onSave, onCancel }: any) {
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.name')} *</label>
           <input
             type="text"
             value={formData.name}
@@ -905,7 +911,7 @@ function MaterialForm({ item, onSave, onCancel }: any) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.description')}</label>
           <input
             type="text"
             value={formData.description}
@@ -914,7 +920,7 @@ function MaterialForm({ item, onSave, onCancel }: any) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Unit *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.unit')} *</label>
           <select
             value={formData.unit}
             onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
@@ -933,16 +939,16 @@ function MaterialForm({ item, onSave, onCancel }: any) {
           onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
           className="rounded"
         />
-        <label className="text-sm text-gray-700">Active</label>
+        <label className="text-sm text-gray-700">{t('common.active')}</label>
       </div>
       <div className="flex gap-2">
         <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
           <Save className="w-4 h-4" />
-          Save
+          {t('common.save')}
         </button>
         <button type="button" onClick={onCancel} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
           <X className="w-4 h-4" />
-          Cancel
+          {t('common.cancel')}
         </button>
       </div>
     </form>
@@ -950,6 +956,7 @@ function MaterialForm({ item, onSave, onCancel }: any) {
 }
 
 function LocationForm({ item, onSave, onCancel }: any) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: item?.name || '',
     address: item?.address || '',
@@ -967,7 +974,7 @@ function LocationForm({ item, onSave, onCancel }: any) {
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.name')} *</label>
           <input
             type="text"
             value={formData.name}
@@ -977,7 +984,7 @@ function LocationForm({ item, onSave, onCancel }: any) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Manager Name</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.managerName')}</label>
           <input
             type="text"
             value={formData.managerName}
@@ -987,7 +994,7 @@ function LocationForm({ item, onSave, onCancel }: any) {
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Address *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.address')} *</label>
         <input
           type="text"
           value={formData.address}
@@ -997,7 +1004,7 @@ function LocationForm({ item, onSave, onCancel }: any) {
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.phone')}</label>
         <input
           type="text"
           value={formData.phone}
@@ -1012,16 +1019,16 @@ function LocationForm({ item, onSave, onCancel }: any) {
           onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
           className="rounded"
         />
-        <label className="text-sm text-gray-700">Active</label>
+        <label className="text-sm text-gray-700">{t('common.active')}</label>
       </div>
       <div className="flex gap-2">
         <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
           <Save className="w-4 h-4" />
-          Save
+          {t('common.save')}
         </button>
         <button type="button" onClick={onCancel} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
           <X className="w-4 h-4" />
-          Cancel
+          {t('common.cancel')}
         </button>
       </div>
     </form>
@@ -1029,6 +1036,7 @@ function LocationForm({ item, onSave, onCancel }: any) {
 }
 
 function EmailSettingsTab() {
+  const { t } = useTranslation();
   const [smtpSettings, setSmtpSettings] = useState({
     host: '',
     port: '587',
@@ -1064,9 +1072,9 @@ function EmailSettingsTab() {
     setSaving(true);
     try {
       await settingsAPI.save('smtp', smtpSettings);
-      toast.success('Email settings saved');
+      toast.success(t('admin.emailSaved'));
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save settings');
+      toast.error(error.response?.data?.message || t('common.failedToSave'));
     } finally {
       setSaving(false);
     }
@@ -1074,7 +1082,7 @@ function EmailSettingsTab() {
 
   const handleTestEmail = async () => {
     if (!testEmail) {
-      toast.error('Enter a test email address');
+      toast.error(t('common.required'));
       return;
     }
     setTesting(true);
@@ -1086,27 +1094,27 @@ function EmailSettingsTab() {
         reportType: 'purchases',
         format: 'csv',
       });
-      toast.success('Test email sent successfully!');
+      toast.success(t('admin.testEmailSent'));
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to send test email');
+      toast.error(error.response?.data?.message || t('common.failedToSave'));
     } finally {
       setTesting(false);
     }
   };
 
-  if (loading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
+  if (loading) return <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>;
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Email (SMTP) Settings</h2>
-        <p className="text-sm text-gray-500 mt-1">Configure email to send reports and notifications</p>
+        <h2 className="text-xl font-semibold text-gray-900">{t('admin.smtpSettings')}</h2>
+        <p className="text-sm text-gray-500 mt-1">{t('admin.smtpSettingsDesc')}</p>
       </div>
 
       <form onSubmit={handleSave} className="bg-white p-6 rounded-lg shadow space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Host *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.smtpHost')} *</label>
             <input
               type="text"
               value={smtpSettings.host}
@@ -1117,7 +1125,7 @@ function EmailSettingsTab() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Port *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.smtpPort')} *</label>
             <input
               type="number"
               value={smtpSettings.port}
@@ -1126,10 +1134,10 @@ function EmailSettingsTab() {
               placeholder="587"
               required
             />
-            <p className="text-xs text-gray-500 mt-1">Usually 587 (TLS) or 465 (SSL)</p>
+            <p className="text-xs text-gray-500 mt-1">{t('admin.smtpPortHint')}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Username / Email *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.smtpUser')} *</label>
             <input
               type="text"
               value={smtpSettings.user}
@@ -1140,7 +1148,7 @@ function EmailSettingsTab() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.smtpPassword')} *</label>
             <input
               type="password"
               value={smtpSettings.password}
@@ -1151,13 +1159,13 @@ function EmailSettingsTab() {
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">From Address</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('admin.fromAddress')}</label>
             <input
               type="text"
               value={smtpSettings.from}
               onChange={(e) => setSmtpSettings({ ...smtpSettings, from: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-              placeholder="CIVICycle <noreply@example.com> (optional, defaults to username)"
+              placeholder={t('admin.fromAddressHint')}
             />
           </div>
         </div>
@@ -1168,15 +1176,15 @@ function EmailSettingsTab() {
             className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
-            {saving ? 'Saving...' : 'Save Settings'}
+            {saving ? t('common.loading') : t('admin.saveSettings')}
           </button>
         </div>
       </form>
 
       {/* Test Email */}
       <div className="bg-white p-6 rounded-lg shadow space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Test Email Configuration</h3>
-        <p className="text-sm text-gray-500">Send a test email to verify your SMTP settings are working</p>
+        <h3 className="text-lg font-semibold text-gray-900">{t('admin.testEmail')}</h3>
+        <p className="text-sm text-gray-500">{t('admin.testEmailDesc')}</p>
         <div className="flex gap-2">
           <input
             type="email"
@@ -1191,7 +1199,7 @@ function EmailSettingsTab() {
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg disabled:opacity-50"
           >
             <Mail className="w-4 h-4" />
-            {testing ? 'Sending...' : 'Send Test'}
+            {testing ? t('common.loading') : t('admin.sendTest')}
           </button>
         </div>
       </div>
@@ -1200,6 +1208,7 @@ function EmailSettingsTab() {
 }
 
 function DisplaySettingsTab() {
+  const { t } = useTranslation();
   const { dateFormat, timeFormat, setDateFormat, setTimeFormat } = useSettingsStore();
 
   const dateFormats: { value: DateFormat; label: string; example: string }[] = [
@@ -1216,13 +1225,13 @@ function DisplaySettingsTab() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Display Settings</h2>
-        <p className="text-sm text-gray-500 mt-1">Configure how dates and times are displayed throughout the application and in exported reports</p>
+        <h2 className="text-xl font-semibold text-gray-900">{t('admin.displaySettings')}</h2>
+        <p className="text-sm text-gray-500 mt-1">{t('admin.displaySettingsDesc')}</p>
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">Date Format</label>
+          <label className="block text-sm font-medium text-gray-700 mb-3">{t('admin.dateFormat')}</label>
           <div className="space-y-2">
             {dateFormats.map((fmt) => (
               <label key={fmt.value} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -1243,7 +1252,7 @@ function DisplaySettingsTab() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">Time Format</label>
+          <label className="block text-sm font-medium text-gray-700 mb-3">{t('admin.timeFormat')}</label>
           <div className="space-y-2">
             {timeFormats.map((fmt) => (
               <label key={fmt.value} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -1264,7 +1273,7 @@ function DisplaySettingsTab() {
         </div>
 
         <div className="pt-4 border-t border-gray-200">
-          <p className="text-xs text-gray-500">Settings are saved automatically and apply to all reports, exports, and date displays.</p>
+          <p className="text-xs text-gray-500">{t('admin.settingsAutoSave')}</p>
         </div>
       </div>
     </div>

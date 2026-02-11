@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { inventoryAPI, locationsAPI } from '@/lib/api';
 import { Package, AlertTriangle, MapPin } from 'lucide-react';
 
 export default function Inventory() {
+  const { t } = useTranslation();
   const [inventoryData, setInventoryData] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,12 +70,12 @@ export default function Inventory() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('inventory.title')}</h1>
         <button
           onClick={loadInventory}
           className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
         >
-          Refresh
+          {t('common.refresh')}
         </button>
       </div>
 
@@ -82,11 +84,11 @@ export default function Inventory() {
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Stock</p>
+              <p className="text-sm text-gray-600">{t('inventory.totalStock')}</p>
               <p className="text-2xl font-bold text-gray-900">
                 {loading ? '...' : getTotalStock().toFixed(2)}
               </p>
-              <p className="text-xs text-gray-500 mt-1">kg</p>
+              <p className="text-xs text-gray-500 mt-1">{t('common.kg')}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-lg">
               <Package className="w-6 h-6 text-blue-600" />
@@ -97,11 +99,11 @@ export default function Inventory() {
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Zero Stock Items</p>
+              <p className="text-sm text-gray-600">{t('inventory.zeroStockItems')}</p>
               <p className="text-2xl font-bold text-red-600">
                 {loading ? '...' : getLowStockCount()}
               </p>
-              <p className="text-xs text-gray-500 mt-1">items</p>
+              <p className="text-xs text-gray-500 mt-1">{t('common.items')}</p>
             </div>
             <div className="p-3 bg-red-100 rounded-lg">
               <AlertTriangle className="w-6 h-6 text-red-600" />
@@ -112,11 +114,11 @@ export default function Inventory() {
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Stock Value</p>
+              <p className="text-sm text-gray-600">{t('inventory.stockValue')}</p>
               <p className="text-2xl font-bold text-gray-900">
                 ${loading ? '...' : getStockValue().toFixed(2)}
               </p>
-              <p className="text-xs text-gray-500 mt-1">estimated</p>
+              <p className="text-xs text-gray-500 mt-1">{t('common.estimated')}</p>
             </div>
             <div className="p-3 bg-green-100 rounded-lg">
               <Package className="w-6 h-6 text-green-600" />
@@ -127,11 +129,11 @@ export default function Inventory() {
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Material Types</p>
+              <p className="text-sm text-gray-600">{t('inventory.materialTypes')}</p>
               <p className="text-2xl font-bold text-gray-900">
                 {loading ? '...' : inventoryData.length}
               </p>
-              <p className="text-xs text-gray-500 mt-1">active</p>
+              <p className="text-xs text-gray-500 mt-1">{t('common.active')}</p>
             </div>
             <div className="p-3 bg-purple-100 rounded-lg">
               <Package className="w-6 h-6 text-purple-600" />
@@ -146,14 +148,14 @@ export default function Inventory() {
           <MapPin className="w-5 h-5 text-gray-600" />
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Filter by Location
+              {t('inventory.filterByLocation')}
             </label>
             <select
               value={selectedLocation || ''}
               onChange={(e) => setSelectedLocation(e.target.value || null)}
               className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
             >
-              <option value="">All Locations</option>
+              <option value="">{t('common.allLocations')}</option>
               {locations.map((location) => (
                 <option key={location.id} value={location.id}>
                   {location.name}
@@ -166,12 +168,12 @@ export default function Inventory() {
 
       {/* Category Breakdown */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Stock by Category</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('inventory.stockByCategory')}</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {Object.entries(categories).map(([category, quantity]) => (
             <div key={category} className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 capitalize">{category}</p>
-              <p className="text-xl font-bold text-gray-900">{quantity.toFixed(2)} kg</p>
+              <p className="text-xl font-bold text-gray-900">{quantity.toFixed(2)} {t('common.kg')}</p>
             </div>
           ))}
         </div>
@@ -180,29 +182,29 @@ export default function Inventory() {
       {/* Inventory Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Current Stock Levels</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('inventory.currentStockLevels')}</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Material
+                  {t('inventory.material')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Current Stock
+                  {t('inventory.currentStock')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Sale Price/kg
+                  {t('inventory.salePricePerKg')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Estimated Value
+                  {t('inventory.estimatedValue')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
+                  {t('inventory.status')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Location
+                  {t('inventory.location')}
                 </th>
               </tr>
             </thead>
@@ -210,13 +212,13 @@ export default function Inventory() {
               {loading ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                    Loading inventory...
+                    {t('inventory.loadingInventory')}
                   </td>
                 </tr>
               ) : inventoryData.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                    No inventory data available
+                    {t('inventory.noInventory')}
                   </td>
                 </tr>
               ) : (
@@ -232,7 +234,7 @@ export default function Inventory() {
                       <td className="px-4 py-3 text-sm text-gray-900">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold">{qty.toFixed(2)}</span>
-                          <span className="text-gray-500">kg</span>
+                          <span className="text-gray-500">{t('common.kg')}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
@@ -245,16 +247,16 @@ export default function Inventory() {
                         {isLowStock ? (
                           <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                             <AlertTriangle className="w-3 h-3 mr-1" />
-                            No Stock
+                            {t('inventory.noStock')}
                           </span>
                         ) : (
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                            In Stock
+                            {t('inventory.inStock')}
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        {item.location_name || 'All Locations'}
+                        {item.location_name || t('common.allLocations')}
                       </td>
                     </tr>
                   );

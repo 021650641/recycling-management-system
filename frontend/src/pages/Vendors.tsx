@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { wastePickersAPI } from '@/lib/api';
 import { Plus, Edit2, Trash2, Save, X, Search, UserCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -19,6 +20,7 @@ interface WastePicker {
 }
 
 export default function Vendors() {
+  const { t } = useTranslation();
   const [wastePickers, setWastePickers] = useState<WastePicker[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingItem, setEditingItem] = useState<WastePicker | null>(null);
@@ -58,10 +60,10 @@ export default function Vendors() {
     try {
       if (editingItem) {
         await wastePickersAPI.update(editingItem.id, data);
-        toast.success('Waste picker updated');
+        toast.success(t('vendors.updated'));
       } else {
         await wastePickersAPI.create(data);
-        toast.success('Waste picker created');
+        toast.success(t('vendors.created'));
       }
       setShowForm(false);
       setEditingItem(null);
@@ -72,10 +74,10 @@ export default function Vendors() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this waste picker?')) return;
+    if (!confirm(t('vendors.confirmDelete'))) return;
     try {
       await wastePickersAPI.delete(id);
-      toast.success('Waste picker deleted');
+      toast.success(t('vendors.deleted'));
       loadData(searchQuery);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to delete waste picker');
@@ -85,11 +87,11 @@ export default function Vendors() {
   const getPaymentMethodLabel = (method: string) => {
     switch (method) {
       case 'cash':
-        return 'Cash';
+        return t('transactions.cash');
       case 'bank_transfer':
-        return 'Bank Transfer';
+        return t('transactions.bankTransfer');
       case 'mobile_money':
-        return 'Mobile Money';
+        return t('transactions.mobileMoney');
       default:
         return method || '-';
     }
@@ -100,7 +102,7 @@ export default function Vendors() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <UserCheck className="w-7 h-7 text-primary-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Waste Pickers</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('vendors.title')}</h1>
         </div>
         <button
           onClick={() => {
@@ -110,7 +112,7 @@ export default function Vendors() {
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
         >
           <Plus className="w-4 h-4" />
-          Add Waste Picker
+          {t('vendors.add')}
         </button>
       </div>
 
@@ -123,7 +125,7 @@ export default function Vendors() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name, ID number, phone, or email..."
+              placeholder={t('vendors.searchPlaceholder')}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             />
           </div>
@@ -132,7 +134,7 @@ export default function Vendors() {
             className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg"
           >
             <Search className="w-4 h-4" />
-            Search
+            {t('common.search')}
           </button>
         </div>
       </form>
@@ -149,7 +151,7 @@ export default function Vendors() {
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading waste pickers...</div>
+        <div className="text-center py-12 text-gray-500">{t('vendors.loading')}</div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
@@ -157,25 +159,25 @@ export default function Vendors() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Name
+                    {t('common.name')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    ID Number
+                    {t('vendors.idNumber')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Phone
+                    {t('common.phone')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Email
+                    {t('common.email')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Payment Method
+                    {t('vendors.paymentMethod')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Status
+                    {t('common.status')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Actions
+                    {t('common.actions')}
                   </th>
                 </tr>
               </thead>
@@ -183,7 +185,7 @@ export default function Vendors() {
                 {wastePickers.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
-                      No waste pickers found
+                      {t('vendors.noResults')}
                     </td>
                   </tr>
                 ) : (
@@ -194,7 +196,7 @@ export default function Vendors() {
                           {picker.first_name} {picker.last_name}
                           {picker.is_affiliated && (
                             <span className="px-1.5 py-0.5 text-xs rounded bg-blue-100 text-blue-700">
-                              Affiliated
+                              {t('vendors.isAffiliated')}
                             </span>
                           )}
                         </div>
@@ -219,7 +221,7 @@ export default function Vendors() {
                               : 'bg-red-100 text-red-800'
                           }`}
                         >
-                          {picker.is_active ? 'Active' : 'Inactive'}
+                          {picker.is_active ? t('common.active') : t('common.inactive')}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -264,6 +266,7 @@ function VendorForm({
   onSave: (data: any) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     firstName: item?.first_name || '',
     lastName: item?.last_name || '',
@@ -296,11 +299,11 @@ function VendorForm({
   return (
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
       <h2 className="text-lg font-semibold text-gray-900">
-        {item ? 'Edit Waste Picker' : 'Add Waste Picker'}
+        {item ? t('vendors.editTitle') : t('vendors.addTitle')}
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('vendors.firstName')} *</label>
           <input
             type="text"
             value={formData.firstName}
@@ -310,7 +313,7 @@ function VendorForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('vendors.lastName')} *</label>
           <input
             type="text"
             value={formData.lastName}
@@ -320,7 +323,7 @@ function VendorForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">ID Number *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('vendors.idNumber')} *</label>
           <input
             type="text"
             value={formData.idNumber}
@@ -330,7 +333,7 @@ function VendorForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Phone *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.phone')} *</label>
           <input
             type="tel"
             value={formData.phone}
@@ -340,7 +343,7 @@ function VendorForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.email')}</label>
           <input
             type="email"
             value={formData.email}
@@ -349,7 +352,7 @@ function VendorForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.address')}</label>
           <input
             type="text"
             value={formData.address}
@@ -358,20 +361,20 @@ function VendorForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('vendors.paymentMethod')} *</label>
           <select
             value={formData.paymentMethod}
             onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             required
           >
-            <option value="cash">Cash</option>
-            <option value="bank_transfer">Bank Transfer</option>
-            <option value="mobile_money">Mobile Money</option>
+            <option value="cash">{t('transactions.cash')}</option>
+            <option value="bank_transfer">{t('transactions.bankTransfer')}</option>
+            <option value="mobile_money">{t('transactions.mobileMoney')}</option>
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Bank Name</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('vendors.bankName')}</label>
           <input
             type="text"
             value={formData.bankName}
@@ -380,7 +383,7 @@ function VendorForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Bank Account</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('vendors.bankAccount')}</label>
           <input
             type="text"
             value={formData.bankAccount}
@@ -396,7 +399,7 @@ function VendorForm({
               onChange={(e) => setFormData({ ...formData, isAffiliated: e.target.checked })}
               className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
             />
-            <span className="text-sm font-medium text-gray-700">Affiliated</span>
+            <span className="text-sm font-medium text-gray-700">{t('vendors.isAffiliated')}</span>
           </label>
         </div>
       </div>
@@ -406,7 +409,7 @@ function VendorForm({
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
         >
           <Save className="w-4 h-4" />
-          Save
+          {t('common.save')}
         </button>
         <button
           type="button"
@@ -414,7 +417,7 @@ function VendorForm({
           className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg"
         >
           <X className="w-4 h-4" />
-          Cancel
+          {t('common.cancel')}
         </button>
       </div>
     </form>

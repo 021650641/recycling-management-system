@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usersAPI, locationsAPI } from '@/lib/api';
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function UsersPage() {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +29,7 @@ export default function UsersPage() {
       setLocations(locData);
     } catch (error) {
       console.error('Failed to load users:', error);
-      toast.error('Failed to load users');
+      toast.error(t('common.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -37,27 +39,27 @@ export default function UsersPage() {
     try {
       if (editingUser) {
         await usersAPI.update(editingUser.id, data);
-        toast.success('User updated');
+        toast.success(t('users.updated'));
       } else {
         await usersAPI.create(data);
-        toast.success('User created');
+        toast.success(t('users.created'));
       }
       setShowForm(false);
       setEditingUser(null);
       loadData();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save user');
+      toast.error(error.response?.data?.message || t('common.failedToSave'));
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
+    if (!confirm(t('users.confirmDelete'))) return;
     try {
       await usersAPI.delete(id);
-      toast.success('User deleted');
+      toast.success(t('users.deleted'));
       loadData();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to delete user');
+      toast.error(error.response?.data?.message || t('common.failedToDelete'));
     }
   };
 
@@ -79,13 +81,13 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('users.title')}</h1>
         <button
           onClick={() => { setEditingUser(null); setShowForm(true); }}
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
         >
           <Plus className="w-4 h-4" />
-          Add User
+          {t('users.add')}
         </button>
       </div>
 
@@ -99,25 +101,25 @@ export default function UsersPage() {
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading users...</div>
+        <div className="text-center py-12 text-gray-500">{t('users.loading')}</div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.name')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.email')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('users.role')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.location')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.status')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {users.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                    No users found
+                    {t('users.noResults')}
                   </td>
                 </tr>
               ) : (
@@ -137,7 +139,7 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 text-xs rounded-full ${user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {user.is_active ? 'Active' : 'Inactive'}
+                        {user.is_active ? t('common.active') : t('common.inactive')}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -162,6 +164,7 @@ export default function UsersPage() {
 }
 
 function UserForm({ item, locations, onSave, onCancel }: any) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     email: item?.email || '',
     password: '',
@@ -190,7 +193,7 @@ function UserForm({ item, locations, onSave, onCancel }: any) {
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('users.firstName')} *</label>
           <input
             type="text"
             value={formData.firstName}
@@ -200,7 +203,7 @@ function UserForm({ item, locations, onSave, onCancel }: any) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('users.lastName')} *</label>
           <input
             type="text"
             value={formData.lastName}
@@ -210,7 +213,7 @@ function UserForm({ item, locations, onSave, onCancel }: any) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.email')} *</label>
           <input
             type="email"
             value={formData.email}
@@ -221,7 +224,7 @@ function UserForm({ item, locations, onSave, onCancel }: any) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Password {item ? '(leave blank to keep)' : '*'}
+            {t('users.password')} {item ? t('users.passwordHint') : '*'}
           </label>
           <input
             type="password"
@@ -232,26 +235,26 @@ function UserForm({ item, locations, onSave, onCancel }: any) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Role *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('users.role')} *</label>
           <select
             value={formData.role}
             onChange={(e) => setFormData({ ...formData, role: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
           >
-            <option value="admin">Admin</option>
-            <option value="manager">Manager</option>
-            <option value="operator">Operator</option>
-            <option value="viewer">Viewer</option>
+            <option value="admin">{t('users.roleAdmin')}</option>
+            <option value="manager">{t('users.roleManager')}</option>
+            <option value="operator">{t('users.roleOperator')}</option>
+            <option value="viewer">{t('users.roleViewer')}</option>
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.location')}</label>
           <select
             value={formData.locationId}
             onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
           >
-            <option value="">No location</option>
+            <option value="">-</option>
             {locations.map((l: any) => (
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
@@ -261,11 +264,11 @@ function UserForm({ item, locations, onSave, onCancel }: any) {
       <div className="flex gap-2">
         <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
           <Save className="w-4 h-4" />
-          Save
+          {t('common.save')}
         </button>
         <button type="button" onClick={onCancel} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
           <X className="w-4 h-4" />
-          Cancel
+          {t('common.cancel')}
         </button>
       </div>
     </form>

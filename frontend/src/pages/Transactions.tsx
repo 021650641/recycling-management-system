@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { transactionsAPI } from '@/lib/api';
 import { Plus, Filter, Search } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function Transactions() {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'purchase' | 'sale'>('all');
   const [filterPayment, setFilterPayment] = useState<'all' | 'paid' | 'pending' | 'partial'>('all');
@@ -42,40 +44,40 @@ export default function Transactions() {
 
   const stats = {
     total: transactions?.length || 0,
-    apartment: transactions?.filter(t => t.source_type === 'apartment').length || 0,
-    wastePicker: transactions?.filter(t => t.source_type === 'waste_picker').length || 0,
-    pending: transactions?.filter(t => t.payment_status !== 'paid').length || 0,
+    apartment: transactions?.filter(tx => tx.source_type === 'apartment').length || 0,
+    wastePicker: transactions?.filter(tx => tx.source_type === 'waste_picker').length || 0,
+    pending: transactions?.filter(tx => tx.payment_status !== 'paid').length || 0,
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('transactions.title')}</h1>
         <Link
           to="/transactions/new"
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors"
         >
           <Plus className="w-5 h-5" />
-          New Transaction
+          {t('transactions.new')}
         </Link>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg shadow">
-          <p className="text-sm text-gray-600">Total</p>
+          <p className="text-sm text-gray-600">{t('common.total')}</p>
           <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
-          <p className="text-sm text-gray-600">Apartment</p>
+          <p className="text-sm text-gray-600">{t('transactions.apartment')}</p>
           <p className="text-2xl font-bold text-green-600">{stats.apartment}</p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
-          <p className="text-sm text-gray-600">Waste Picker</p>
+          <p className="text-sm text-gray-600">{t('transactions.wastePicker')}</p>
           <p className="text-2xl font-bold text-blue-600">{stats.wastePicker}</p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
-          <p className="text-sm text-gray-600">Pending Payment</p>
+          <p className="text-sm text-gray-600">{t('transactions.pendingPayment')}</p>
           <p className="text-2xl font-bold text-red-600">{stats.pending}</p>
         </div>
       </div>
@@ -84,48 +86,48 @@ export default function Transactions() {
       <div className="bg-white p-4 rounded-lg shadow space-y-4">
         <div className="flex items-center gap-2 text-gray-700 font-medium">
           <Filter className="w-5 h-5" />
-          Filters
+          {t('transactions.filters')}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm text-gray-600 mb-2">Search</label>
+            <label className="block text-sm text-gray-600 mb-2">{t('common.search')}</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by source, material, location..."
+                placeholder={t('transactions.searchTransactions')}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm text-gray-600 mb-2">Source Type</label>
+            <label className="block text-sm text-gray-600 mb-2">{t('transactions.sourceType')}</label>
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value as any)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
             >
-              <option value="all">All Types</option>
-              <option value="apartment">Apartment</option>
-              <option value="waste_picker">Waste Picker</option>
+              <option value="all">{t('common.allTypes')}</option>
+              <option value="apartment">{t('transactions.apartment')}</option>
+              <option value="waste_picker">{t('transactions.wastePicker')}</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-sm text-gray-600 mb-2">Payment Status</label>
+            <label className="block text-sm text-gray-600 mb-2">{t('transactions.paymentStatus')}</label>
             <select
               value={filterPayment}
               onChange={(e) => setFilterPayment(e.target.value as any)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
             >
-              <option value="all">All Status</option>
-              <option value="paid">Paid</option>
-              <option value="partial">Partial</option>
-              <option value="pending">Pending</option>
+              <option value="all">{t('common.allStatus')}</option>
+              <option value="paid">{t('transactions.paid')}</option>
+              <option value="partial">{t('transactions.partial')}</option>
+              <option value="pending">{t('transactions.pending')}</option>
             </select>
           </div>
         </div>
@@ -138,28 +140,28 @@ export default function Transactions() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
+                  {t('common.date')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Location
+                  {t('transactions.location')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Material
+                  {t('transactions.material')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Source
+                  {t('transactions.source')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Weight (kg)
+                  {t('transactions.weightKg')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total Cost
+                  {t('transactions.totalCost')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Paid
+                  {t('transactions.totalPaid')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
+                  {t('common.status')}
                 </th>
               </tr>
             </thead>
@@ -167,53 +169,57 @@ export default function Transactions() {
               {loading ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                    Loading transactions...
+                    {t('transactions.loadingTransactions')}
                   </td>
                 </tr>
               ) : !filteredTransactions || filteredTransactions.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                    No transactions found
+                    {t('transactions.noTransactions')}
                   </td>
                 </tr>
               ) : (
-                filteredTransactions.map((t) => (
-                  <tr key={t.id} className="hover:bg-gray-50">
+                filteredTransactions.map((tx) => (
+                  <tr key={tx.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      {format(new Date(t.transaction_date || t.created_at), 'MMM dd, yyyy')}
+                      {format(new Date(tx.transaction_date || tx.created_at), 'MMM dd, yyyy')}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      {t.location_name || '-'}
+                      {tx.location_name || '-'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      {t.material_category || '-'}
+                      {tx.material_category || '-'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      {t.source_name || '-'}
+                      {tx.source_name || '-'}
                       <span className="block text-xs text-gray-500 capitalize">
-                        {(t.source_type || '').replace('_', ' ')}
+                        {(tx.source_type || '').replace('_', ' ')}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      {parseFloat(t.weight_kg || 0).toFixed(2)}
+                      {parseFloat(tx.weight_kg || 0).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                      ${parseFloat(t.total_cost || 0).toFixed(2)}
+                      ${parseFloat(tx.total_cost || 0).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      ${parseFloat(t.paid_amount || 0).toFixed(2)}
+                      ${parseFloat(tx.paid_amount || 0).toFixed(2)}
                     </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          t.payment_status === 'paid'
+                          tx.payment_status === 'paid'
                             ? 'bg-green-100 text-green-800'
-                            : t.payment_status === 'partial'
+                            : tx.payment_status === 'partial'
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-red-100 text-red-800'
                         }`}
                       >
-                        {t.payment_status}
+                        {tx.payment_status === 'paid'
+                          ? t('transactions.paid')
+                          : tx.payment_status === 'partial'
+                          ? t('transactions.partial')
+                          : t('transactions.pending')}
                       </span>
                     </td>
                   </tr>

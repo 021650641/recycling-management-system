@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { clientsAPI } from '@/lib/api';
 import { Plus, Edit2, Trash2, Save, X, Search, Building2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -15,6 +16,7 @@ interface Client {
 }
 
 export default function Clients() {
+  const { t } = useTranslation();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingItem, setEditingItem] = useState<Client | null>(null);
@@ -52,10 +54,10 @@ export default function Clients() {
     try {
       if (editingItem) {
         await clientsAPI.update(editingItem.id, data);
-        toast.success('Client updated');
+        toast.success(t('clients.updated'));
       } else {
         await clientsAPI.create(data);
-        toast.success('Client created');
+        toast.success(t('clients.created'));
       }
       setShowForm(false);
       setEditingItem(null);
@@ -66,10 +68,10 @@ export default function Clients() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to deactivate this client?')) return;
+    if (!confirm(t('clients.confirmDeactivate'))) return;
     try {
       await clientsAPI.delete(id);
-      toast.success('Client deactivated');
+      toast.success(t('clients.deactivated'));
       loadData(searchQuery);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to delete client');
@@ -81,14 +83,14 @@ export default function Clients() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Building2 className="w-7 h-7 text-primary-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Clients</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('clients.title')}</h1>
         </div>
         <button
           onClick={() => { setEditingItem(null); setShowForm(true); }}
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
         >
           <Plus className="w-4 h-4" />
-          Add Client
+          {t('clients.add')}
         </button>
       </div>
 
@@ -100,13 +102,13 @@ export default function Clients() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name, contact, or email..."
+              placeholder={t('clients.searchPlaceholder')}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             />
           </div>
           <button type="submit" className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">
             <Search className="w-4 h-4" />
-            Search
+            {t('common.search')}
           </button>
         </div>
       </form>
@@ -120,26 +122,26 @@ export default function Clients() {
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading clients...</div>
+        <div className="text-center py-12 text-gray-500">{t('clients.loading')}</div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Terms</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.name')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('clients.contactPerson')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.phone')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.email')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('clients.paymentTerms')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.status')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {clients.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">No clients found</td>
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">{t('clients.noResults')}</td>
                   </tr>
                 ) : (
                   clients.map((client) => (
@@ -153,7 +155,7 @@ export default function Clients() {
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
                           client.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                         }`}>
-                          {client.is_active ? 'Active' : 'Inactive'}
+                          {client.is_active ? t('common.active') : t('common.inactive')}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -179,6 +181,7 @@ export default function Clients() {
 }
 
 function ClientForm({ item, onSave, onCancel }: { item: Client | null; onSave: (data: any) => void; onCancel: () => void }) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: item?.name || '',
     contactName: item?.contact_name || '',
@@ -195,30 +198,30 @@ function ClientForm({ item, onSave, onCancel }: { item: Client | null; onSave: (
 
   return (
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
-      <h2 className="text-lg font-semibold text-gray-900">{item ? 'Edit Client' : 'Add Client'}</h2>
+      <h2 className="text-lg font-semibold text-gray-900">{item ? t('clients.editTitle') : t('clients.addTitle')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Company Name *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('clients.companyName')} *</label>
           <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Contact Person</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('clients.contactPerson')}</label>
           <input type="text" value={formData.contactName} onChange={(e) => setFormData({ ...formData, contactName: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.phone')}</label>
           <input type="tel" value={formData.contactPhone} onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.email')}</label>
           <input type="email" value={formData.contactEmail} onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.address')}</label>
           <input type="text" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Payment Terms</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('clients.paymentTerms')}</label>
           <select value={formData.paymentTerms} onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
             <option value="">Select terms</option>
             <option value="cod">Cash on Delivery</option>
@@ -231,10 +234,10 @@ function ClientForm({ item, onSave, onCancel }: { item: Client | null; onSave: (
       </div>
       <div className="flex gap-2 pt-2">
         <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
-          <Save className="w-4 h-4" /> Save
+          <Save className="w-4 h-4" /> {t('common.save')}
         </button>
         <button type="button" onClick={onCancel} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
-          <X className="w-4 h-4" /> Cancel
+          <X className="w-4 h-4" /> {t('common.cancel')}
         </button>
       </div>
     </form>

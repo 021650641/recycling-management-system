@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { salesAPI, clientsAPI, materialsAPI, locationsAPI } from '@/lib/api';
 import { Plus, Save, X, DollarSign, Truck, ShoppingCart } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -24,6 +25,7 @@ interface Sale {
 }
 
 export default function SalesPage() {
+  const { t } = useTranslation();
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -46,7 +48,7 @@ export default function SalesPage() {
       setTotal(response.data?.total || 0);
     } catch (error) {
       console.error('Failed to load sales:', error);
-      toast.error('Failed to load sales');
+      toast.error(t('sales.loadError'));
     } finally {
       setLoading(false);
     }
@@ -70,32 +72,41 @@ export default function SalesPage() {
   const handleCreate = async (data: any) => {
     try {
       await salesAPI.create(data);
-      toast.success('Sale created');
+      toast.success(t('sales.created'));
       setShowForm(false);
       loadData();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to create sale');
+      toast.error(error.response?.data?.error || t('sales.createError'));
     }
   };
 
   const handleUpdatePayment = async (id: string, paymentStatus: string) => {
     try {
       await salesAPI.updatePayment(id, { paymentStatus });
-      toast.success('Payment updated');
+      toast.success(t('sales.paymentUpdated'));
       loadData();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to update payment');
+      toast.error(error.response?.data?.error || t('sales.paymentUpdateError'));
     }
   };
 
   const handleUpdateDelivery = async (id: string, deliveryStatus: string) => {
     try {
       await salesAPI.updateDelivery(id, { deliveryStatus });
-      toast.success('Delivery updated');
+      toast.success(t('sales.deliveryUpdated'));
       loadData();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to update delivery');
+      toast.error(error.response?.data?.error || t('sales.deliveryUpdateError'));
     }
+  };
+
+  const statusKeys: Record<string, string> = {
+    paid: 'sales.paid',
+    partial: 'sales.partial',
+    pending: 'sales.pending',
+    delivered: 'sales.delivered',
+    in_transit: 'sales.inTransit',
+    not_delivered: 'sales.notDelivered',
   };
 
   const getStatusBadge = (status: string, _type: 'payment' | 'delivery') => {
@@ -107,9 +118,10 @@ export default function SalesPage() {
       in_transit: 'bg-blue-100 text-blue-800',
       not_delivered: 'bg-gray-100 text-gray-800',
     };
+    const key = statusKeys[status || 'pending'] || 'sales.pending';
     return (
       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${colors[status] || 'bg-gray-100 text-gray-800'}`}>
-        {(status || 'pending').replace(/_/g, ' ')}
+        {t(key)}
       </span>
     );
   };
@@ -120,8 +132,8 @@ export default function SalesPage() {
         <div className="flex items-center gap-3">
           <ShoppingCart className="w-7 h-7 text-primary-600" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Sales</h1>
-            <p className="text-sm text-gray-500">{total} total sales</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('sales.title')}</h1>
+            <p className="text-sm text-gray-500">{t('sales.totalSales', { count: total })}</p>
           </div>
         </div>
         <button
@@ -129,7 +141,7 @@ export default function SalesPage() {
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
         >
           <Plus className="w-4 h-4" />
-          New Sale
+          {t('sales.create')}
         </button>
       </div>
 
@@ -144,28 +156,28 @@ export default function SalesPage() {
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading sales...</div>
+        <div className="text-center py-12 text-gray-500">{t('sales.loading')}</div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sale #</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Weight (kg)</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Payment</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Delivery</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('sales.saleNumber')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.date')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('sales.client')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('sales.material')}</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('sales.weightKg')}</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('common.total')}</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">{t('sales.payment')}</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">{t('sales.delivery')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {sales.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-gray-500">No sales found</td>
+                    <td colSpan={9} className="px-4 py-8 text-center text-gray-500">{t('sales.noResults')}</td>
                   </tr>
                 ) : (
                   sales.map((sale) => (
@@ -194,7 +206,7 @@ export default function SalesPage() {
                             <button
                               onClick={() => handleUpdatePayment(sale.id, 'paid')}
                               className="text-green-600 hover:text-green-800 p-1"
-                              title="Mark as Paid"
+                              title={t('sales.markAsPaid')}
                             >
                               <DollarSign className="w-4 h-4" />
                             </button>
@@ -203,7 +215,7 @@ export default function SalesPage() {
                             <button
                               onClick={() => handleUpdateDelivery(sale.id, 'delivered')}
                               className="text-blue-600 hover:text-blue-800 p-1"
-                              title="Mark as Delivered"
+                              title={t('sales.markAsDelivered')}
                             >
                               <Truck className="w-4 h-4" />
                             </button>
@@ -228,6 +240,7 @@ function SaleForm({
   clients: any[]; materials: any[]; locations: any[];
   onSave: (data: any) => void; onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     clientId: '',
     locationId: '',
@@ -255,64 +268,64 @@ function SaleForm({
 
   return (
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
-      <h2 className="text-lg font-semibold text-gray-900">New Sale</h2>
+      <h2 className="text-lg font-semibold text-gray-900">{t('sales.create')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Client *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.client')} *</label>
           <select
             value={formData.clientId}
             onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             required
           >
-            <option value="">Select client</option>
+            <option value="">{t('sales.selectClient')}</option>
             {clients.filter(c => c.is_active !== false).map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Location *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.location')} *</label>
           <select
             value={formData.locationId}
             onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             required
           >
-            <option value="">Select location</option>
+            <option value="">{t('sales.selectLocation')}</option>
             {locations.filter(l => l.is_active !== false).map((l) => (
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Material *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.material')} *</label>
           <select
             value={formData.materialCategoryId}
             onChange={(e) => setFormData({ ...formData, materialCategoryId: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             required
           >
-            <option value="">Select material</option>
+            <option value="">{t('sales.selectMaterial')}</option>
             {materials.filter(m => m.is_active !== false).map((m) => (
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.paymentMethod')}</label>
           <select
             value={formData.paymentMethod}
             onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
           >
-            <option value="cash">Cash</option>
-            <option value="bank_transfer">Bank Transfer</option>
-            <option value="mobile_money">Mobile Money</option>
+            <option value="cash">{t('sales.cash')}</option>
+            <option value="bank_transfer">{t('sales.bankTransfer')}</option>
+            <option value="mobile_money">{t('sales.mobileMoney')}</option>
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Weight (kg) *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.weightKg')} *</label>
           <input
             type="number"
             step="0.01"
@@ -324,38 +337,38 @@ function SaleForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Unit Price (leave blank to auto-fill)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.unitPrice')}</label>
           <input
             type="number"
             step="0.01"
             value={formData.unitPrice}
             onChange={(e) => setFormData({ ...formData, unitPrice: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-            placeholder="Auto from daily price"
+            placeholder={t('sales.autoFromDailyPrice')}
           />
         </div>
       </div>
       {formData.weightKg && formData.unitPrice && (
         <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-sm text-gray-600">Total Amount: <span className="font-semibold text-gray-900">${totalAmount}</span></p>
+          <p className="text-sm text-gray-600">{t('sales.totalAmount')}: <span className="font-semibold text-gray-900">${totalAmount}</span></p>
         </div>
       )}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.notes')}</label>
         <textarea
           value={formData.notes}
           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           rows={2}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-          placeholder="Additional notes..."
+          placeholder={t('sales.notesPlaceholder')}
         />
       </div>
       <div className="flex gap-2 pt-2">
         <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
-          <Save className="w-4 h-4" /> Create Sale
+          <Save className="w-4 h-4" /> {t('common.save')}
         </button>
         <button type="button" onClick={onCancel} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
-          <X className="w-4 h-4" /> Cancel
+          <X className="w-4 h-4" /> {t('common.cancel')}
         </button>
       </div>
     </form>
