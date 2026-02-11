@@ -698,9 +698,9 @@ function AnalysisTab({ dateRange, refreshKey, t, onStateChange }: any) {
                       {groupBy === 'unit' && <td className="px-4 py-2 text-sm text-gray-500">{i === 0 ? row.resident_name || '' : ''}</td>}
                       <td className="px-4 py-2 text-sm">{row.sub_group || '-'}</td>
                       <td className="px-4 py-2 text-sm text-right">{row.record_count}</td>
-                      <td className="px-4 py-2 text-sm text-right">{parseFloat(row.total_weight_kg).toFixed(1)}</td>
+                      <td className="px-4 py-2 text-sm text-right">{parseFloat(row.total_weight_kg).toFixed(2)}</td>
                       <td className="px-4 py-2 text-sm text-right">${parseFloat(row.total_value).toFixed(2)}</td>
-                      <td className="px-4 py-2 text-sm text-right">${parseFloat(row.avg_price_per_kg).toFixed(2)}</td>
+                      <td className="px-4 py-2 text-sm text-right">${parseFloat(row.avg_price_per_kg).toFixed(4)}</td>
                     </tr>
                   ))}
                   {rows.length > 1 && (
@@ -709,7 +709,7 @@ function AnalysisTab({ dateRange, refreshKey, t, onStateChange }: any) {
                       {groupBy === 'unit' && <td />}
                       <td />
                       <td className="px-4 py-2 text-sm text-right font-bold">{grpCount}</td>
-                      <td className="px-4 py-2 text-sm text-right font-bold">{grpWeight.toFixed(1)}</td>
+                      <td className="px-4 py-2 text-sm text-right font-bold">{grpWeight.toFixed(2)}</td>
                       <td className="px-4 py-2 text-sm text-right font-bold">${grpValue.toFixed(2)}</td>
                       <td />
                     </tr>
@@ -724,9 +724,9 @@ function AnalysisTab({ dateRange, refreshKey, t, onStateChange }: any) {
                 {groupBy === 'unit' && <td />}
                 <td className="px-4 py-3 text-sm text-gray-500">{Object.keys(groups).length} {groupLabel.toLowerCase()}s</td>
                 <td className="px-4 py-3 text-sm text-right">{grandCount}</td>
-                <td className="px-4 py-3 text-sm text-right">{grandWeight.toFixed(1)}</td>
+                <td className="px-4 py-3 text-sm text-right">{grandWeight.toFixed(2)}</td>
                 <td className="px-4 py-3 text-sm text-right">${grandValue.toFixed(2)}</td>
-                <td className="px-4 py-3 text-sm text-right">{grandWeight > 0 ? `$${(grandValue / grandWeight).toFixed(2)}` : '-'}</td>
+                <td className="px-4 py-3 text-sm text-right">{grandWeight > 0 ? `$${(grandValue / grandWeight).toFixed(4)}` : '-'}</td>
               </tr>
             </tfoot>
           </table>

@@ -506,7 +506,7 @@ router.get('/export', async (req: any, res, next): Promise<any> => {
 
     let reportData: any[];
     let title = '';
-    let columns: { header: string; key: string; width?: number }[] = [];
+    let columns: { header: string; key: string; width?: number; align?: 'left' | 'right' | 'center'; format?: 'number' | 'currency' | 'decimal2' | 'decimal4' }[] = [];
     const fmtStart = startDate ? formatDate(startDate, dateFormat as string) : '';
     const fmtEnd = endDate ? formatDate(endDate, dateFormat as string) : '';
     const dateSubtitle = fmtStart && fmtEnd ? `${fmtStart} to ${fmtEnd}` : 'All time';
@@ -523,11 +523,11 @@ router.get('/export', async (req: any, res, next): Promise<any> => {
       if (groupBy === 'vendor') {
         columns = [
           { header: 'Vendor', key: 'waste_picker_name', width: 120 },
-          { header: 'Transactions', key: 'transaction_count', width: 80 },
-          { header: 'Weight (kg)', key: 'total_weight_kg', width: 80 },
-          { header: 'Total Cost', key: 'total_cost', width: 80 },
-          { header: 'Paid', key: 'total_paid', width: 80 },
-          { header: 'Outstanding', key: 'total_outstanding', width: 80 },
+          { header: 'Transactions', key: 'transaction_count', width: 80, align: 'right' as const },
+          { header: 'Weight (kg)', key: 'total_weight_kg', width: 80, align: 'right' as const, format: 'decimal2' as const },
+          { header: 'Total Cost', key: 'total_cost', width: 80, align: 'right' as const, format: 'currency' as const },
+          { header: 'Paid', key: 'total_paid', width: 80, align: 'right' as const, format: 'currency' as const },
+          { header: 'Outstanding', key: 'total_outstanding', width: 80, align: 'right' as const, format: 'currency' as const },
         ];
         const result = await query(`
           SELECT wp.first_name || ' ' || wp.last_name AS waste_picker_name,
@@ -545,9 +545,9 @@ router.get('/export', async (req: any, res, next): Promise<any> => {
           { header: 'Location', key: 'location_name', width: 100 },
           { header: 'Vendor', key: 'waste_picker_name', width: 100 },
           { header: 'Material', key: 'material_name', width: 80 },
-          { header: 'Weight (kg)', key: 'weight_kg', width: 70 },
-          { header: 'Unit Price', key: 'unit_price', width: 70 },
-          { header: 'Total', key: 'total_cost', width: 70 },
+          { header: 'Weight (kg)', key: 'weight_kg', width: 70, align: 'right' as const, format: 'decimal2' as const },
+          { header: 'Unit Price', key: 'unit_price', width: 70, align: 'right' as const, format: 'currency' as const },
+          { header: 'Total', key: 'total_cost', width: 70, align: 'right' as const, format: 'currency' as const },
           { header: 'Status', key: 'payment_status', width: 60 },
         ];
         const result = await query(`
@@ -574,11 +574,11 @@ router.get('/export', async (req: any, res, next): Promise<any> => {
       if (groupBy === 'client') {
         columns = [
           { header: 'Client', key: 'client_name', width: 120 },
-          { header: 'Sales', key: 'sale_count', width: 60 },
-          { header: 'Weight (kg)', key: 'total_weight_kg', width: 80 },
-          { header: 'Revenue', key: 'total_revenue', width: 80 },
-          { header: 'Paid', key: 'total_paid', width: 80 },
-          { header: 'Outstanding', key: 'total_outstanding', width: 80 },
+          { header: 'Sales', key: 'sale_count', width: 60, align: 'right' as const },
+          { header: 'Weight (kg)', key: 'total_weight_kg', width: 80, align: 'right' as const, format: 'decimal2' as const },
+          { header: 'Revenue', key: 'total_revenue', width: 80, align: 'right' as const, format: 'currency' as const },
+          { header: 'Paid', key: 'total_paid', width: 80, align: 'right' as const, format: 'currency' as const },
+          { header: 'Outstanding', key: 'total_outstanding', width: 80, align: 'right' as const, format: 'currency' as const },
         ];
         const result = await query(`
           SELECT c.name AS client_name, COUNT(s.id) AS sale_count,
@@ -596,9 +596,9 @@ router.get('/export', async (req: any, res, next): Promise<any> => {
           { header: 'Location', key: 'location_name', width: 100 },
           { header: 'Client', key: 'client_name', width: 100 },
           { header: 'Material', key: 'material_name', width: 80 },
-          { header: 'Weight (kg)', key: 'weight_kg', width: 70 },
-          { header: 'Unit Price', key: 'unit_price', width: 70 },
-          { header: 'Total', key: 'total_amount', width: 70 },
+          { header: 'Weight (kg)', key: 'weight_kg', width: 70, align: 'right' as const, format: 'decimal2' as const },
+          { header: 'Unit Price', key: 'unit_price', width: 70, align: 'right' as const, format: 'currency' as const },
+          { header: 'Total', key: 'total_amount', width: 70, align: 'right' as const, format: 'currency' as const },
           { header: 'Payment', key: 'payment_status', width: 60 },
           { header: 'Delivery', key: 'delivery_status', width: 60 },
         ];
@@ -620,23 +620,24 @@ router.get('/export', async (req: any, res, next): Promise<any> => {
       const aggLabel = String(aggGroupBy).charAt(0).toUpperCase() + String(aggGroupBy).slice(1);
       title = `${dataType === 'sales' ? 'Sales' : 'Purchases'} Analysis by ${aggLabel}`;
       const hasResident = aggGroupBy === 'unit';
+      const subLabel = aggGroupBy === 'material' ? (dataType === 'sales' ? 'Client' : 'Vendor') : 'Material';
       columns = hasResident
         ? [
             { header: aggLabel, key: 'group_name', width: 140 },
             { header: 'Resident', key: 'resident_name', width: 100 },
-            { header: aggGroupBy === 'material' ? (dataType === 'sales' ? 'Client' : 'Vendor') : 'Material', key: 'sub_group', width: 100 },
-            { header: '#', key: 'record_count', width: 40 },
-            { header: 'Weight (kg)', key: 'total_weight_kg', width: 80 },
-            { header: dataType === 'sales' ? 'Revenue' : 'Cost', key: 'total_value', width: 80 },
-            { header: 'Avg $/kg', key: 'avg_price_per_kg', width: 70 },
+            { header: subLabel, key: 'sub_group', width: 100 },
+            { header: '#', key: 'record_count', width: 40, align: 'right' as const },
+            { header: 'Weight (kg)', key: 'total_weight_kg', width: 80, align: 'right' as const, format: 'decimal2' as const },
+            { header: dataType === 'sales' ? 'Revenue' : 'Cost', key: 'total_value', width: 80, align: 'right' as const, format: 'currency' as const },
+            { header: 'Avg $/kg', key: 'avg_price_per_kg', width: 70, align: 'right' as const, format: 'decimal4' as const },
           ]
         : [
             { header: aggLabel, key: 'group_name', width: 140 },
-            { header: aggGroupBy === 'material' ? (dataType === 'sales' ? 'Client' : 'Vendor') : 'Material', key: 'sub_group', width: 100 },
-            { header: '#', key: 'record_count', width: 40 },
-            { header: 'Weight (kg)', key: 'total_weight_kg', width: 80 },
-            { header: dataType === 'sales' ? 'Revenue' : 'Cost', key: 'total_value', width: 80 },
-            { header: 'Avg $/kg', key: 'avg_price_per_kg', width: 70 },
+            { header: subLabel, key: 'sub_group', width: 100 },
+            { header: '#', key: 'record_count', width: 40, align: 'right' as const },
+            { header: 'Weight (kg)', key: 'total_weight_kg', width: 80, align: 'right' as const, format: 'decimal2' as const },
+            { header: dataType === 'sales' ? 'Revenue' : 'Cost', key: 'total_value', width: 80, align: 'right' as const, format: 'currency' as const },
+            { header: 'Avg $/kg', key: 'avg_price_per_kg', width: 70, align: 'right' as const, format: 'decimal4' as const },
           ];
 
       // Direct query approach
@@ -714,6 +715,17 @@ router.get('/export', async (req: any, res, next): Promise<any> => {
         `, aParams);
         reportData = r.rows;
       }
+
+      // Deduplicate group_name and resident_name: only show on first row of each group
+      let lastGroup = '';
+      for (const row of reportData) {
+        if (row.group_name === lastGroup) {
+          row.group_name = '';
+          if (row.resident_name !== undefined) row.resident_name = '';
+        } else {
+          lastGroup = row.group_name;
+        }
+      }
     } else if (reportType === 'traceability') {
       title = 'Traceability Report';
       columns = [
@@ -723,8 +735,8 @@ router.get('/export', async (req: any, res, next): Promise<any> => {
         { header: 'Vendor', key: 'waste_picker_name', width: 90 },
         { header: 'Location', key: 'location_name', width: 90 },
         { header: 'Material', key: 'material_category', width: 70 },
-        { header: 'Weight (kg)', key: 'weight_kg', width: 60 },
-        { header: 'Cost', key: 'total_cost', width: 60 },
+        { header: 'Weight (kg)', key: 'weight_kg', width: 60, align: 'right' as const, format: 'decimal2' as const },
+        { header: 'Cost', key: 'total_cost', width: 60, align: 'right' as const, format: 'currency' as const },
         { header: 'Status', key: 'payment_status', width: 60 },
       ];
       const params: any[] = [];

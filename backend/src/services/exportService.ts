@@ -1,13 +1,34 @@
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
 
+interface ReportColumn {
+  header: string;
+  key: string;
+  width?: number;
+  align?: 'left' | 'right' | 'center';
+  format?: 'number' | 'currency' | 'decimal2' | 'decimal4';
+}
+
 interface ReportData {
   title: string;
   subtitle?: string;
-  columns: { header: string; key: string; width?: number }[];
+  columns: ReportColumn[];
   rows: Record<string, any>[];
   summary?: Record<string, string | number>;
   generatedAt?: string;
+}
+
+function isNumericColumn(col: ReportColumn): boolean {
+  return col.align === 'right' || !!col.format || /weight|cost|revenue|price|total|#|count/i.test(col.header);
+}
+
+function formatCellValue(val: any, col: ReportColumn): string {
+  if (val == null || val === '') return '-';
+  if (col.format === 'currency') return `$${parseFloat(val).toFixed(2)}`;
+  if (col.format === 'decimal2') return parseFloat(val).toFixed(2);
+  if (col.format === 'decimal4') return parseFloat(val).toFixed(4);
+  if (col.format === 'number') return String(Math.round(parseFloat(val)));
+  return String(val);
 }
 
 export async function generatePDF(data: ReportData): Promise<Buffer> {
@@ -51,7 +72,8 @@ export async function generatePDF(data: ReportData): Promise<Buffer> {
     let x = 40;
     data.columns.forEach((col) => {
       const w = col.width || defaultColWidth;
-      doc.text(col.header, x, tableTop, { width: w, align: 'left' });
+      const align = col.align || (isNumericColumn(col) ? 'right' : 'left');
+      doc.text(col.header, x, tableTop, { width: w, align });
       x += w;
     });
 
@@ -71,8 +93,9 @@ export async function generatePDF(data: ReportData): Promise<Buffer> {
       x = 40;
       data.columns.forEach((col) => {
         const w = col.width || defaultColWidth;
-        const val = row[col.key] != null ? String(row[col.key]) : '-';
-        doc.text(val, x, y, { width: w, align: 'left' });
+        const align = col.align || (isNumericColumn(col) ? 'right' : 'left');
+        const val = formatCellValue(row[col.key], col);
+        doc.text(val, x, y, { width: w, align });
         x += w;
       });
       y += 16;
@@ -133,19 +156,27 @@ export async function generateExcel(data: ReportData): Promise<Buffer> {
     cell.border = {
       bottom: { style: 'thin', color: { argb: 'FF000000' } },
     };
+    const align = col.align || (isNumericColumn(col) ? 'right' : 'left');
+    cell.alignment = { horizontal: align };
     sheet.getColumn(i + 1).width = col.width ? col.width / 5 : 18;
   });
 
   // Data rows
   data.rows.forEach((row) => {
-    const values = data.columns.map((col) => {
-      const val = row[col.key];
-      if (val == null) return '';
-      const num = parseFloat(val);
-      if (!isNaN(num) && typeof val !== 'boolean') return num;
-      return String(val);
+    const excelRow = sheet.addRow(
+      data.columns.map((col) => {
+        const val = row[col.key];
+        if (val == null) return '';
+        const num = parseFloat(val);
+        if (!isNaN(num) && typeof val !== 'boolean') return num;
+        return String(val);
+      })
+    );
+    // Apply alignment to data cells
+    data.columns.forEach((col, i) => {
+      const align = col.align || (isNumericColumn(col) ? 'right' : 'left');
+      excelRow.getCell(i + 1).alignment = { horizontal: align };
     });
-    sheet.addRow(values);
   });
 
   // Auto-filter
@@ -170,7 +201,7 @@ export function generateCSV(data: ReportData): string {
 
   const header = data.columns.map((col) => escape(col.header)).join(',');
   const rows = data.rows.map((row) =>
-    data.columns.map((col) => escape(row[col.key])).join(',')
+    data.columns.map((col) => escape(formatCellValue(row[col.key], col))).join(',')
   );
 
   return [header, ...rows].join('\n');
