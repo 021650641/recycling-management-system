@@ -575,7 +575,7 @@ router.get('/export', async (req: any, res, next): Promise<any> => {
 // ─── Email Report ───
 router.post('/email', authorize('admin', 'manager'), async (req: any, res, next): Promise<any> => {
   try {
-    if (!isEmailConfigured()) {
+    if (!(await isEmailConfigured())) {
       return res.status(400).json({ error: 'Email is not configured. Contact your administrator to set SMTP settings.' });
     }
 

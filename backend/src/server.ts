@@ -86,11 +86,19 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   });
 });
 
+// Log registered route modules
+const routeModules = [
+  'auth', 'transactions', 'inventory', 'reports', 'locations',
+  'materials', 'waste-pickers', 'apartments', 'clients', 'sales',
+  'sync', 'users', 'settings',
+];
+console.log(`Registered ${routeModules.length} route modules under ${config.apiPrefix}`);
+
 // Start server
 const server = app.listen(config.port, () => {
-  console.log(`🚀 Server running on port ${config.port}`);
-  console.log(`📝 API available at http://localhost:${config.port}${config.apiPrefix}`);
-  console.log(`🌍 Environment: ${config.nodeEnv}`);
+  console.log(`Server running on port ${config.port}`);
+  console.log(`API available at http://localhost:${config.port}${config.apiPrefix}`);
+  console.log(`Environment: ${config.nodeEnv}`);
 });
 
 // Graceful shutdown

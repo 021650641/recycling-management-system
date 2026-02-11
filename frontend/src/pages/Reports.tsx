@@ -23,6 +23,7 @@ export default function Reports() {
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const exportRef = useRef<HTMLDivElement>(null);
   const [dateRange, setDateRange] = useState({
     startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
@@ -115,7 +116,7 @@ export default function Reports() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900">{t('reports.title')}</h1>
         <div className="flex items-center gap-2">
-          <button onClick={() => loadReports()}
+          <button onClick={() => { loadReports(); setRefreshKey(k => k + 1); }}
             disabled={loading}
             className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50">
             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -194,7 +195,7 @@ export default function Reports() {
               {activeTab === 'overview' && <OverviewTab summary={summary} trends={trends} pendingPayments={pendingPayments} t={t} />}
               {activeTab === 'purchases' && <PurchasesTab data={purchases} groupBy={purchaseGroupBy} setGroupBy={setPurchaseGroupBy} t={t} />}
               {activeTab === 'sales' && <SalesTab data={sales} groupBy={salesGroupBy} setGroupBy={setSalesGroupBy} t={t} />}
-              {activeTab === 'traceability' && <TraceabilityTab dateRange={dateRange} t={t} />}
+              {activeTab === 'traceability' && <TraceabilityTab dateRange={dateRange} refreshKey={refreshKey} t={t} />}
             </>
           )}
         </div>
@@ -478,7 +479,7 @@ function SalesTab({ data, groupBy, setGroupBy, t }: any) {
   );
 }
 
-function TraceabilityTab({ dateRange, t }: any) {
+function TraceabilityTab({ dateRange, refreshKey, t }: any) {
   const [data, setData] = useState<any>({ transactions: [], summary: [] });
   const [loading, setLoading] = useState(true);
   const dateKey = `${dateRange.startDate}_${dateRange.endDate}`;
@@ -493,7 +494,7 @@ function TraceabilityTab({ dateRange, t }: any) {
 
   useEffect(() => {
     loadData();
-  }, [dateKey]);
+  }, [dateKey, refreshKey]);
 
   if (loading) return <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>;
 
