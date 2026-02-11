@@ -70,14 +70,12 @@ export const locationsAPI = {
   delete: (id: number) => api.delete(`/locations/${id}`),
 };
 
-// Daily Prices API
+// Daily Prices API (prices live under /materials/prices)
 export const pricesAPI = {
-  getAll: (params?: any) => api.get('/prices', { params }),
-  getByMaterial: (materialId: number, date?: string) =>
-    api.get(`/prices/material/${materialId}`, { params: { date } }),
-  create: (data: any) => api.post('/prices', data),
-  update: (id: number, data: any) => api.put(`/prices/${id}`, data),
-  bulkUpdate: (data: any[]) => api.post('/prices/bulk', data),
+  getLatest: (params?: any) => api.get('/materials/prices', { params }),
+  getAll: (params?: any) => api.get('/materials/prices/all', { params }),
+  create: (data: any) => api.post('/materials/prices', data),
+  bulkSave: (prices: any[]) => api.post('/materials/prices/bulk', { prices }),
 };
 
 // Inventory API

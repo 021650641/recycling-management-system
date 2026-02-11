@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { materialsAPI, locationsAPI, settingsAPI } from '@/lib/api';
+import { materialsAPI, locationsAPI, settingsAPI, pricesAPI } from '@/lib/api';
 import { api } from '@/lib/api';
-import { Plus, Edit2, Trash2, Save, X, Mail, Settings } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Mail, Settings, Clock, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useSettingsStore, type DateFormat, type TimeFormat } from '@/store/settingsStore';
+import { formatDate } from '@/lib/dateFormat';
 
 type TabType = 'materials' | 'locations' | 'pricing' | 'email' | 'display';
 
@@ -32,7 +33,6 @@ export default function AdminPanel() {
         const data = Array.isArray(response.data) ? response.data : response.data?.locations || [];
         setLocations(data);
       } else if (activeTab === 'pricing') {
-        // Load materials for the pricing form dropdown
         const matResponse = await materialsAPI.getAll();
         const matData = Array.isArray(matResponse.data) ? matResponse.data : matResponse.data?.materials || [];
         setMaterials(matData);
@@ -41,8 +41,7 @@ export default function AdminPanel() {
         const locData = Array.isArray(locResponse.data) ? locResponse.data : locResponse.data?.locations || [];
         setLocations(locData);
 
-        // Prices are at /materials/prices, not /prices
-        const priceResponse = await api.get('/materials/prices');
+        const priceResponse = await pricesAPI.getLatest();
         const priceData = Array.isArray(priceResponse.data) ? priceResponse.data : priceResponse.data?.prices || [];
         setPrices(priceData);
       }
@@ -73,7 +72,6 @@ export default function AdminPanel() {
           toast.success('Location created');
         }
       } else if (activeTab === 'pricing') {
-        // Prices endpoint is at /materials/prices
         await api.post('/materials/prices', data);
         toast.success(editingItem ? 'Price updated' : 'Price created');
       }
@@ -218,59 +216,6 @@ export default function AdminPanel() {
     </div>
   );
 
-  const renderPricingTab = () => (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-900">Pricing Management</h2>
-        <button
-          onClick={() => {
-            setEditingItem(null);
-            setShowForm(true);
-          }}
-          className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
-        >
-          <Plus className="w-4 h-4" />
-          Add Price
-        </button>
-      </div>
-
-      {showForm && <PriceForm item={editingItem} materials={materials} locations={locations} onSave={handleSave} onCancel={() => setShowForm(false)} />}
-
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchase Price/kg</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sale Price/kg</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {prices.map((price, index) => (
-              <tr key={price.id || index}>
-                <td className="px-4 py-3 text-sm text-gray-900">
-                  {price.material_name || materials.find(m => m.id === price.material_category_id)?.name || 'Unknown'}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">
-                  {price.location_id ? locations.find(l => l.id === price.location_id)?.name || '-' : 'All'}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">
-                  ${parseFloat(price.purchase_price_per_kg || 0).toFixed(2)}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">
-                  ${parseFloat(price.sale_price_per_kg || 0).toFixed(2)}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">{price.date || '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
@@ -334,13 +279,13 @@ export default function AdminPanel() {
       </div>
 
       {/* Content */}
-      {loading ? (
+      {loading && activeTab !== 'pricing' ? (
         <div className="text-center py-12 text-gray-500">Loading...</div>
       ) : (
         <>
           {activeTab === 'materials' && renderMaterialsTab()}
           {activeTab === 'locations' && renderLocationsTab()}
-          {activeTab === 'pricing' && renderPricingTab()}
+          {activeTab === 'pricing' && <PricingTab materials={materials} locations={locations} initialPrices={prices} onReload={loadData} loading={loading} />}
           {activeTab === 'email' && <EmailSettingsTab />}
           {activeTab === 'display' && <DisplaySettingsTab />}
         </>
@@ -349,7 +294,583 @@ export default function AdminPanel() {
   );
 }
 
-// Form Components
+// ===== Pricing Tab (revamped) =====
+function PricingTab({ materials, locations, initialPrices, onReload, loading: parentLoading }: {
+  materials: any[];
+  locations: any[];
+  initialPrices: any[];
+  onReload: () => void;
+  loading: boolean;
+}) {
+  const { dateFormat } = useSettingsStore();
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showExpired, setShowExpired] = useState(false);
+  const [filterDate, setFilterDate] = useState('');
+  const [allPrices, setAllPrices] = useState<any[]>([]);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  // Load all prices when filters change
+  useEffect(() => {
+    loadAllPrices();
+  }, [showExpired, filterDate]);
+
+  const loadAllPrices = async () => {
+    setLoadingAll(true);
+    try {
+      const params: any = {};
+      if (showExpired) params.showExpired = 'true';
+      if (filterDate) params.filterDate = filterDate;
+      const response = await pricesAPI.getAll(params);
+      const data = Array.isArray(response.data) ? response.data : response.data?.prices || [];
+      setAllPrices(data);
+    } catch (error) {
+      console.error('Failed to load prices:', error);
+    } finally {
+      setLoadingAll(false);
+    }
+  };
+
+  const handleSingleSave = async (data: any) => {
+    try {
+      await pricesAPI.create(data);
+      toast.success('Price saved');
+      setShowAddForm(false);
+      loadAllPrices();
+      onReload();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to save price');
+    }
+  };
+
+  const handleBulkSaved = () => {
+    setShowBulkModal(false);
+    loadAllPrices();
+    onReload();
+  };
+
+  const isAllDay = (from: string, to: string) => {
+    return (!from || from === '00:00:00') && (!to || to === '23:59:59');
+  };
+
+  const formatTime12 = (time: string) => {
+    if (!time) return '';
+    const [h, m] = time.split(':');
+    const hour = parseInt(h);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    return `${h12}:${m} ${ampm}`;
+  };
+
+  const formatTimeDisplay = (time: string) => {
+    const { timeFormat } = useSettingsStore.getState();
+    if (!time) return '';
+    if (timeFormat === '12h') return formatTime12(time);
+    return time.substring(0, 5); // HH:mm
+  };
+
+  if (parentLoading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
+
+  return (
+    <div className="space-y-4">
+      {/* Header with actions */}
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <h2 className="text-xl font-semibold text-gray-900">Pricing Management</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Add Single Price
+          </button>
+          <button
+            onClick={() => setShowBulkModal(true)}
+            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm"
+          >
+            <Calendar className="w-4 h-4" />
+            Set Daily Prices
+          </button>
+        </div>
+      </div>
+
+      {/* Single price form */}
+      {showAddForm && (
+        <PriceForm
+          materials={materials}
+          locations={locations}
+          onSave={handleSingleSave}
+          onCancel={() => setShowAddForm(false)}
+        />
+      )}
+
+      {/* Bulk price modal */}
+      {showBulkModal && (
+        <BulkPriceModal
+          materials={materials}
+          latestPrices={initialPrices}
+          onClose={() => setShowBulkModal(false)}
+          onSaved={handleBulkSaved}
+        />
+      )}
+
+      {/* Filters */}
+      <div className="bg-white p-4 rounded-lg shadow flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showExpired}
+            onChange={(e) => setShowExpired(e.target.checked)}
+            className="rounded text-primary-600 focus:ring-primary-500"
+          />
+          <span className="text-sm text-gray-700">Show expired prices</span>
+        </label>
+
+        {showExpired && (
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-700">Filter by date:</label>
+            <input
+              type="date"
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+            />
+            {filterDate && (
+              <button
+                onClick={() => setFilterDate('')}
+                className="text-xs text-gray-500 hover:text-gray-700 underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Price list */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Purchase $/kg</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Sale $/kg</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Validity</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {loadingAll ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
+            ) : allPrices.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No prices found</td></tr>
+            ) : (
+              allPrices.map((price, index) => {
+                const today = new Date().toISOString().split('T')[0];
+                const priceDate = price.date ? price.date.split('T')[0] : '';
+                const isExpired = priceDate < today;
+
+                return (
+                  <tr key={price.id || index} className={isExpired ? 'bg-gray-50 text-gray-400' : ''}>
+                    <td className="px-4 py-3 text-sm">
+                      {price.material_name || 'Unknown'}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {price.location_id ? locations.find(l => l.id === price.location_id)?.name || '-' : 'All'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right font-mono">
+                      ${parseFloat(price.purchase_price_per_kg || 0).toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right font-mono">
+                      ${parseFloat(price.sale_price_per_kg || 0).toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {formatDate(priceDate, dateFormat)}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {isAllDay(price.valid_from_time, price.valid_to_time) ? (
+                        <span className="text-gray-500">All day</span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-gray-400" />
+                          {formatTimeDisplay(price.valid_from_time)} - {formatTimeDisplay(price.valid_to_time)}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ===== Bulk Price Modal =====
+function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
+  materials: any[];
+  latestPrices: any[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { dateFormat } = useSettingsStore();
+  const today = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [saving, setSaving] = useState(false);
+
+  // Build editable rows: one per active material, pre-populated with latest prices
+  const [rows, setRows] = useState<Array<{
+    materialCategoryId: string;
+    materialName: string;
+    purchasePricePerKg: string;
+    salePricePerKg: string;
+    allDay: boolean;
+    validFromTime: string;
+    validToTime: string;
+  }>>([]);
+
+  useEffect(() => {
+    const editableRows = materials
+      .filter(m => m.is_active !== false)
+      .map(m => {
+        const existing = latestPrices.find(p => p.material_category_id === m.id);
+        return {
+          materialCategoryId: m.id,
+          materialName: m.name,
+          purchasePricePerKg: existing ? String(existing.purchase_price_per_kg) : '',
+          salePricePerKg: existing ? String(existing.sale_price_per_kg) : '',
+          allDay: true,
+          validFromTime: '00:00',
+          validToTime: '23:59',
+        };
+      });
+    setRows(editableRows);
+  }, [materials, latestPrices]);
+
+  const updateRow = (index: number, field: string, value: any) => {
+    setRows(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const handleSaveAll = async () => {
+    // Filter out rows with no prices set
+    const validRows = rows.filter(r => r.purchasePricePerKg && r.salePricePerKg);
+    if (validRows.length === 0) {
+      toast.error('No prices to save');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const pricesToSave = validRows.map(r => ({
+        materialCategoryId: r.materialCategoryId,
+        locationId: null,
+        date: selectedDate,
+        purchasePricePerKg: parseFloat(r.purchasePricePerKg),
+        salePricePerKg: parseFloat(r.salePricePerKg),
+        validFromTime: r.allDay ? '00:00:00' : `${r.validFromTime}:00`,
+        validToTime: r.allDay ? '23:59:59' : `${r.validToTime}:59`,
+      }));
+
+      await pricesAPI.bulkSave(pricesToSave);
+      toast.success(`${pricesToSave.length} prices saved for ${formatDate(selectedDate, dateFormat)}`);
+      onSaved();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to save prices');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setAllToAllDay = (allDay: boolean) => {
+    setRows(prev => prev.map(r => ({
+      ...r,
+      allDay,
+      validFromTime: allDay ? '00:00' : r.validFromTime,
+      validToTime: allDay ? '23:59' : r.validToTime,
+    })));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Modal header */}
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Set Daily Prices</h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Pre-populated with the latest available prices. Edit and save for the selected date.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Date selector and time toggle */}
+        <div className="px-6 py-3 border-b border-gray-100 flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">Date:</label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={() => setAllToAllDay(true)}
+              className="text-xs px-3 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+            >
+              Set all to All Day
+            </button>
+          </div>
+        </div>
+
+        {/* Price table */}
+        <div className="flex-1 overflow-auto px-6 py-3">
+          <table className="w-full">
+            <thead className="bg-gray-50 sticky top-0">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Purchase $/kg</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Sale $/kg</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Validity</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((row, index) => (
+                <tr key={row.materialCategoryId} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 text-sm font-medium text-gray-900">
+                    {row.materialName}
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={row.purchasePricePerKg}
+                      onChange={(e) => updateRow(index, 'purchasePricePerKg', e.target.value)}
+                      className="w-28 px-2 py-1 text-right text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 outline-none font-mono"
+                      placeholder="0.00"
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={row.salePricePerKg}
+                      onChange={(e) => updateRow(index, 'salePricePerKg', e.target.value)}
+                      className="w-28 px-2 py-1 text-right text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 outline-none font-mono"
+                      placeholder="0.00"
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center justify-center gap-2">
+                      <label className="flex items-center gap-1 cursor-pointer text-xs">
+                        <input
+                          type="checkbox"
+                          checked={row.allDay}
+                          onChange={(e) => updateRow(index, 'allDay', e.target.checked)}
+                          className="rounded text-primary-600 focus:ring-primary-500"
+                        />
+                        All day
+                      </label>
+                      {!row.allDay && (
+                        <div className="flex items-center gap-1 text-xs">
+                          <input
+                            type="time"
+                            value={row.validFromTime}
+                            onChange={(e) => updateRow(index, 'validFromTime', e.target.value)}
+                            className="px-1 py-0.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-primary-500 outline-none"
+                          />
+                          <span className="text-gray-400">-</span>
+                          <input
+                            type="time"
+                            value={row.validToTime}
+                            onChange={(e) => updateRow(index, 'validToTime', e.target.value)}
+                            className="px-1 py-0.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-primary-500 outline-none"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Modal footer */}
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+          <p className="text-xs text-gray-500">
+            {rows.filter(r => r.purchasePricePerKg && r.salePricePerKg).length} of {rows.length} materials with prices set
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveAll}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Saving...' : 'Save All Prices'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Single Price Form =====
+function PriceForm({ item, materials, locations, onSave, onCancel }: any) {
+  const [formData, setFormData] = useState({
+    materialCategoryId: item?.material_category_id || '',
+    locationId: item?.location_id || '',
+    purchasePricePerKg: item?.purchase_price_per_kg || '',
+    salePricePerKg: item?.sale_price_per_kg || '',
+    date: item?.date?.split('T')[0] || new Date().toISOString().split('T')[0],
+    allDay: true,
+    validFromTime: '00:00',
+    validToTime: '23:59',
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      materialCategoryId: formData.materialCategoryId,
+      locationId: formData.locationId || null,
+      purchasePricePerKg: parseFloat(formData.purchasePricePerKg),
+      salePricePerKg: parseFloat(formData.salePricePerKg),
+      date: formData.date,
+      validFromTime: formData.allDay ? '00:00:00' : `${formData.validFromTime}:00`,
+      validToTime: formData.allDay ? '23:59:59' : `${formData.validToTime}:59`,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Material *</label>
+          <select
+            value={formData.materialCategoryId}
+            onChange={(e) => setFormData({ ...formData, materialCategoryId: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+            required
+          >
+            <option value="">Select material</option>
+            {materials.map((m: any) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Location (Optional)</label>
+          <select
+            value={formData.locationId}
+            onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+          >
+            <option value="">All locations</option>
+            {locations.map((l: any) => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Purchase Price/kg *</label>
+          <input
+            type="number"
+            step="0.01"
+            value={formData.purchasePricePerKg}
+            onChange={(e) => setFormData({ ...formData, purchasePricePerKg: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Sale Price/kg *</label>
+          <input
+            type="number"
+            step="0.01"
+            value={formData.salePricePerKg}
+            onChange={(e) => setFormData({ ...formData, salePricePerKg: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Date *</label>
+          <input
+            type="date"
+            value={formData.date}
+            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Time Validity</label>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.allDay}
+                onChange={(e) => setFormData({ ...formData, allDay: e.target.checked })}
+                className="rounded text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm text-gray-700">All day</span>
+            </label>
+            {!formData.allDay && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  value={formData.validFromTime}
+                  onChange={(e) => setFormData({ ...formData, validFromTime: e.target.value })}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                />
+                <span className="text-gray-400">to</span>
+                <input
+                  type="time"
+                  value={formData.validToTime}
+                  onChange={(e) => setFormData({ ...formData, validToTime: e.target.value })}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
+          <Save className="w-4 h-4" />
+          Save
+        </button>
+        <button type="button" onClick={onCancel} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
+          <X className="w-4 h-4" />
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ===== Form Components =====
 function MaterialForm({ item, onSave, onCancel }: any) {
   const [formData, setFormData] = useState({
     name: item?.name || '',
@@ -740,102 +1261,5 @@ function DisplaySettingsTab() {
         </div>
       </div>
     </div>
-  );
-}
-
-function PriceForm({ item, materials, locations, onSave, onCancel }: any) {
-  const [formData, setFormData] = useState({
-    materialCategoryId: item?.material_category_id || '',
-    locationId: item?.location_id || '',
-    purchasePricePerKg: item?.purchase_price_per_kg || '',
-    salePricePerKg: item?.sale_price_per_kg || '',
-    date: item?.date || new Date().toISOString().split('T')[0],
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave({
-      materialCategoryId: formData.materialCategoryId,
-      locationId: formData.locationId || null,
-      purchasePricePerKg: parseFloat(formData.purchasePricePerKg),
-      salePricePerKg: parseFloat(formData.salePricePerKg),
-      date: formData.date,
-    });
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Material *</label>
-          <select
-            value={formData.materialCategoryId}
-            onChange={(e) => setFormData({ ...formData, materialCategoryId: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-            required
-          >
-            <option value="">Select material</option>
-            {materials.map((m: any) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Location (Optional)</label>
-          <select
-            value={formData.locationId}
-            onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-          >
-            <option value="">All locations</option>
-            {locations.map((l: any) => (
-              <option key={l.id} value={l.id}>{l.name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Purchase Price/kg *</label>
-          <input
-            type="number"
-            step="0.01"
-            value={formData.purchasePricePerKg}
-            onChange={(e) => setFormData({ ...formData, purchasePricePerKg: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Sale Price/kg *</label>
-          <input
-            type="number"
-            step="0.01"
-            value={formData.salePricePerKg}
-            onChange={(e) => setFormData({ ...formData, salePricePerKg: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Date *</label>
-          <input
-            type="date"
-            value={formData.date}
-            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-            required
-          />
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
-          <Save className="w-4 h-4" />
-          Save
-        </button>
-        <button type="button" onClick={onCancel} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
-          <X className="w-4 h-4" />
-          Cancel
-        </button>
-      </div>
-    </form>
   );
 }
