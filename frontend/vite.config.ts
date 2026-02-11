@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Recycling Management System',
-        short_name: 'RecycleApp',
-        description: 'Offline-capable recycling inventory and transaction management',
+        name: 'CIVICycle',
+        short_name: 'CIVICycle',
+        description: 'CIVICycle - Recycling management and traceability platform',
         theme_color: '#10b981',
         icons: [
           {

@@ -159,9 +159,9 @@ router.get('/purchases', async (req, res, next) => {
       LIMIT 1000
     `, params);
 
-    res.json({ purchases: result.rows });
+    return res.json({ purchases: result.rows });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -248,9 +248,9 @@ router.get('/sales', async (req, res, next) => {
       LIMIT 1000
     `, params);
 
-    res.json({ sales: result.rows });
+    return res.json({ sales: result.rows });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
