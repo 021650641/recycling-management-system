@@ -637,12 +637,18 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
 
         {/* Price table */}
         <div className="flex-1 overflow-auto px-6 py-3">
-          <table className="w-full">
+          <table className="w-full table-fixed">
+            <colgroup>
+              <col className="w-[35%]" />
+              <col className="w-[20%]" />
+              <col className="w-[20%]" />
+              <col className="w-[25%]" />
+            </colgroup>
             <thead className="bg-gray-50 sticky top-0">
               <tr>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Purchase $/kg</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Sale $/kg</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Purchase $/kg</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Sale $/kg</th>
                 <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Validity</th>
               </tr>
             </thead>
@@ -652,7 +658,7 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
                   <td className="px-3 py-2 text-sm font-medium text-gray-900">
                     {row.materialName}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 text-center">
                     <input
                       type="number"
                       step="0.01"
@@ -663,7 +669,7 @@ function BulkPriceModal({ materials, latestPrices, onClose, onSaved }: {
                       placeholder="0.00"
                     />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 text-center">
                     <input
                       type="number"
                       step="0.01"
