@@ -80,29 +80,68 @@ class SyncService {
       const response = await syncAPI.pull(lastSyncTime || undefined);
       const { transactions, materials, locations, prices } = response.data;
 
-      // Update local data
+      // Update local data - backend returns snake_case, map to Dexie schema
       if (materials?.length) {
-        await db.materials.bulkPut(materials);
+        const mapped = materials.map((m: any) => ({
+          id: m.id,
+          name: m.name,
+          category: m.category || m.name,
+          unit: m.unit || 'kg',
+          currentStock: m.current_stock || 0,
+          minStockLevel: m.min_stock_level,
+          isActive: m.is_active ?? true,
+        }));
+        await db.materials.bulkPut(mapped);
       }
 
       if (locations?.length) {
-        await db.locations.bulkPut(locations);
+        const mapped = locations.map((l: any) => ({
+          id: l.id,
+          name: l.name,
+          type: l.type || 'warehouse',
+          address: l.address,
+          isActive: l.is_active ?? true,
+        }));
+        await db.locations.bulkPut(mapped);
       }
 
       if (prices?.length) {
-        await db.dailyPrices.bulkPut(prices);
+        const mapped = prices.map((p: any) => ({
+          id: p.id,
+          materialId: p.material_category_id || p.material_id,
+          locationId: p.location_id,
+          purchasePrice: parseFloat(p.purchase_price || p.price_per_kg || 0),
+          salePrice: parseFloat(p.sale_price || p.price_per_kg || 0),
+          effectiveDate: p.date || p.effective_date,
+        }));
+        await db.dailyPrices.bulkPut(mapped);
       }
 
       if (transactions?.length) {
-        // Only update if not locally modified
-        for (const transaction of transactions) {
+        for (const txn of transactions) {
+          const txnId = txn.id || txn.transaction_id;
+          if (!txnId) continue;
+
           const existing = await db.transactions
             .where('transactionId')
-            .equals(transaction.transactionId)
+            .equals(txnId)
             .first();
 
           if (!existing || existing.synced) {
-            await db.transactions.put({ ...transaction, synced: true });
+            await db.transactions.put({
+              transactionId: txnId,
+              type: 'purchase',
+              materialId: txn.material_category_id,
+              quantity: parseFloat(txn.weight_kg || 0),
+              unitPrice: parseFloat(txn.unit_price || 0),
+              totalAmount: parseFloat(txn.total_cost || 0),
+              paymentStatus: txn.payment_status || 'pending',
+              paidAmount: parseFloat(txn.paid_amount || 0),
+              notes: txn.notes,
+              userId: txn.recorded_by,
+              createdAt: txn.transaction_date || txn.created_at,
+              synced: true,
+            });
           }
         }
       }
