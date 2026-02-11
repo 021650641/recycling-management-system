@@ -29,4 +29,50 @@ router.post('/', authorize('admin'), async (req, res, next) => {
   }
 });
 
+router.put('/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { email, password, firstName, lastName, role, locationId } = req.body;
+
+    let result;
+    if (password) {
+      const passwordHash = await bcrypt.hash(password, 10);
+      result = await query(
+        'UPDATE "user" SET email=$1, password_hash=$2, first_name=$3, last_name=$4, role=$5, location_id=$6 WHERE id=$7 RETURNING id, email, first_name, last_name, role, location_id, is_active',
+        [email, passwordHash, firstName, lastName, role, locationId || null, id]
+      );
+    } else {
+      result = await query(
+        'UPDATE "user" SET email=$1, first_name=$2, last_name=$3, role=$4, location_id=$5 WHERE id=$6 RETURNING id, email, first_name, last_name, role, location_id, is_active',
+        [email, firstName, lastName, role, locationId || null, id]
+      );
+    }
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ message: 'User not found' });
+    } else {
+      res.json(result.rows[0]);
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await query(
+      'UPDATE "user" SET is_active = false WHERE id=$1 RETURNING id',
+      [id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ message: 'User not found' });
+    } else {
+      res.json({ message: 'User deactivated' });
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
