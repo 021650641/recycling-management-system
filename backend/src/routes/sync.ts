@@ -32,16 +32,18 @@ router.post('/transactions', async (req: any, res, next): Promise<any> => {
           }
 
           // Insert transaction
+          const txNumber = `TX-${Date.now().toString(36).toUpperCase()}`;
           const result = await client.query(
             `INSERT INTO transaction (
-              location_id, material_category_id, source_type,
+              transaction_number, location_id, material_category_id, source_type,
               apartment_complex_id, apartment_unit, waste_picker_id,
               weight_kg, quality_grade, unit_price, total_cost,
               payment_method, notes, recorded_by, device_id,
               transaction_date, is_synced
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             RETURNING id`,
             [
+              txNumber,
               txn.locationId, txn.materialCategoryId, txn.sourceType,
               txn.apartmentComplexId, txn.apartmentUnit, txn.wastePickerId,
               txn.weightKg, txn.qualityGrade, txn.unitPrice, txn.totalCost,
@@ -116,15 +118,17 @@ router.post('/push', async (req: any, res, next): Promise<any> => {
             continue;
           }
 
+          const transactionNumber = `TX-${Date.now().toString(36).toUpperCase()}`;
           await client.query(
             `INSERT INTO transaction (
-              location_id, material_category_id, source_type,
+              transaction_number, location_id, material_category_id, source_type,
               apartment_complex_id, apartment_unit, apartment_unit_id, waste_picker_id,
               weight_kg, quality_grade, unit_price, total_cost,
               payment_method, notes, recorded_by, device_id,
               transaction_date, is_synced
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
             [
+              transactionNumber,
               txn.locationId, txn.materialCategoryId, txn.sourceType,
               txn.apartmentComplexId || null, txn.apartmentUnit || null, txn.apartmentUnitId || null, txn.wastePickerId || null,
               txn.weightKg, txn.qualityGrade || null, txn.unitPrice || null, txn.totalCost || null,

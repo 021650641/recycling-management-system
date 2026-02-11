@@ -4,9 +4,9 @@ export interface Transaction {
   id?: number;
   transactionId?: string;
   type: 'purchase' | 'sale';
-  sourceLocationId?: number;
-  destinationLocationId?: number;
-  materialId: number;
+  sourceLocationId?: string;
+  destinationLocationId?: string;
+  materialId: string;
   quantity: number;
   unitPrice: number;
   totalAmount: number;
@@ -16,14 +16,14 @@ export interface Transaction {
   supplierContact?: string;
   vehicleNumber?: string;
   notes?: string;
-  userId: number;
+  userId: string;
   createdAt: string;
   synced: boolean;
   localId?: string;
 }
 
 export interface Material {
-  id: number;
+  id: string;
   name: string;
   category: string;
   unit: string;
@@ -33,7 +33,7 @@ export interface Material {
 }
 
 export interface Location {
-  id: number;
+  id: string;
   name: string;
   type: 'warehouse' | 'yard' | 'processing';
   address?: string;
@@ -41,9 +41,9 @@ export interface Location {
 }
 
 export interface DailyPrice {
-  id: number;
-  materialId: number;
-  locationId?: number;
+  id: string;
+  materialId: string;
+  locationId?: string;
   purchasePrice: number;
   salePrice: number;
   effectiveDate: string;
@@ -60,11 +60,11 @@ export interface SyncQueue {
 }
 
 export interface User {
-  id: number;
+  id: string;
   username: string;
   fullName: string;
   role: 'admin' | 'manager' | 'operator' | 'viewer';
-  locationId?: number;
+  locationId?: string;
 }
 
 class RecyclingDatabase extends Dexie {
@@ -86,6 +86,14 @@ class RecyclingDatabase extends Dexie {
       users: 'id, username, role'
     });
     this.version(3).stores({
+      transactions: '++id, transactionId, type, materialId, createdAt, synced, localId',
+      materials: 'id, name, category, currentStock, isActive',
+      locations: 'id, name, type, isActive',
+      dailyPrices: 'id, materialId, locationId, effectiveDate',
+      syncQueue: '++id, createdAt, retryCount',
+      users: 'id, username, role'
+    });
+    this.version(4).stores({
       transactions: '++id, transactionId, type, materialId, createdAt, synced, localId',
       materials: 'id, name, category, currentStock, isActive',
       locations: 'id, name, type, isActive',
