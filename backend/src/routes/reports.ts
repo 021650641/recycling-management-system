@@ -393,6 +393,112 @@ router.get('/pending-payments', authorize('admin', 'manager'), async (req, res, 
   }
 });
 
+// ─── Aggregate Report ───
+router.get('/aggregate', async (req: any, res, next): Promise<any> => {
+  try {
+    const { dataType = 'purchases', groupBy = 'vendor', startDate, endDate, locationId, wastePickerId, materialId, clientId, apartmentId, unitId } = req.query;
+    const params: any[] = [];
+    const pc = { n: 1 };
+
+    if (dataType === 'sales') {
+      let where = ' WHERE 1=1';
+      if (locationId) { params.push(locationId); where += ` AND s.location_id = $${pc.n++}`; }
+      if (clientId) { params.push(clientId); where += ` AND s.client_id = $${pc.n++}`; }
+      if (materialId) { params.push(materialId); where += ` AND s.material_category_id = $${pc.n++}`; }
+      where += dateFilter('s.', startDate, endDate, params, pc, 'sale_date');
+
+      let selectGroup: string, groupByClause: string, orderBy: string;
+      if (groupBy === 'client') {
+        selectGroup = `c.name AS group_name, mc.name AS sub_group`;
+        groupByClause = `c.name, mc.name`;
+        orderBy = `c.name, mc.name`;
+      } else if (groupBy === 'location') {
+        selectGroup = `l.name AS group_name, mc.name AS sub_group`;
+        groupByClause = `l.name, mc.name`;
+        orderBy = `l.name, mc.name`;
+      } else {
+        // material - show client breakdown
+        selectGroup = `mc.name AS group_name, c.name AS sub_group`;
+        groupByClause = `mc.name, c.name`;
+        orderBy = `mc.name, c.name`;
+      }
+
+      const result = await query(`
+        SELECT ${selectGroup},
+          COUNT(s.id) AS record_count,
+          SUM(s.weight_kg) AS total_weight_kg,
+          SUM(s.total_amount) AS total_value,
+          AVG(s.unit_price) AS avg_price_per_kg
+        FROM sale s
+        JOIN client c ON s.client_id = c.id
+        JOIN material_category mc ON s.material_category_id = mc.id
+        JOIN location l ON s.location_id = l.id
+        ${where}
+        GROUP BY ${groupByClause}
+        ORDER BY ${orderBy}
+      `, params);
+
+      return res.json({ rows: result.rows });
+    }
+
+    // purchases (transactions)
+    let where = ' WHERE 1=1';
+    if (locationId) { params.push(locationId); where += ` AND t.location_id = $${pc.n++}`; }
+    if (wastePickerId) { params.push(wastePickerId); where += ` AND t.waste_picker_id = $${pc.n++}`; }
+    if (materialId) { params.push(materialId); where += ` AND t.material_category_id = $${pc.n++}`; }
+    if (apartmentId) { params.push(apartmentId); where += ` AND t.apartment_complex_id = $${pc.n++}`; }
+    if (unitId) { params.push(unitId); where += ` AND t.apartment_unit_id = $${pc.n++}`; }
+    where += dateFilter('t.', startDate, endDate, params, pc);
+
+    let selectGroup: string, groupByClause: string, orderBy: string, extraJoins = '';
+    if (groupBy === 'vendor') {
+      selectGroup = `wp.first_name || ' ' || wp.last_name AS group_name, mc.name AS sub_group`;
+      groupByClause = `wp.first_name, wp.last_name, mc.name`;
+      orderBy = `group_name, mc.name`;
+    } else if (groupBy === 'source') {
+      selectGroup = `COALESCE(ac.name, wp.first_name || ' ' || wp.last_name) AS group_name, mc.name AS sub_group`;
+      groupByClause = `COALESCE(ac.name, wp.first_name || ' ' || wp.last_name), mc.name`;
+      orderBy = `group_name, mc.name`;
+    } else if (groupBy === 'unit') {
+      selectGroup = `ac.name || ' - Unit ' || au.unit_number AS group_name, COALESCE(au.resident_name, '') AS resident_name, mc.name AS sub_group`;
+      groupByClause = `ac.name, au.unit_number, au.resident_name, mc.name`;
+      orderBy = `group_name, mc.name`;
+      where += ` AND t.apartment_unit_id IS NOT NULL`;
+    } else if (groupBy === 'location') {
+      selectGroup = `l.name AS group_name, mc.name AS sub_group`;
+      groupByClause = `l.name, mc.name`;
+      orderBy = `l.name, mc.name`;
+    } else {
+      // material - show vendor breakdown
+      selectGroup = `mc.name AS group_name, wp.first_name || ' ' || wp.last_name AS sub_group`;
+      groupByClause = `mc.name, wp.first_name, wp.last_name`;
+      orderBy = `mc.name, sub_group`;
+    }
+
+    const result = await query(`
+      SELECT ${selectGroup},
+        COUNT(t.id) AS record_count,
+        SUM(t.weight_kg) AS total_weight_kg,
+        SUM(t.total_cost) AS total_value,
+        AVG(t.unit_price) AS avg_price_per_kg
+      FROM transaction t
+      JOIN material_category mc ON t.material_category_id = mc.id
+      JOIN location l ON t.location_id = l.id
+      LEFT JOIN waste_picker wp ON t.waste_picker_id = wp.id
+      LEFT JOIN apartment_complex ac ON t.apartment_complex_id = ac.id
+      LEFT JOIN apartment_unit au ON t.apartment_unit_id = au.id
+      ${extraJoins}
+      ${where}
+      GROUP BY ${groupByClause}
+      ORDER BY ${orderBy}
+    `, params);
+
+    return res.json({ rows: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ─── Export Report ───
 router.get('/export', async (req: any, res, next): Promise<any> => {
   try {
@@ -508,6 +614,105 @@ router.get('/export', async (req: any, res, next): Promise<any> => {
           ${where} ORDER BY s.sale_date DESC LIMIT 5000
         `, params);
         reportData = result.rows;
+      }
+    } else if (reportType === 'aggregate') {
+      const { dataType = 'purchases', groupBy: aggGroupBy = 'vendor', wastePickerId: aggWp, materialId: aggMat, clientId: aggCli, apartmentId: aggApt, unitId: aggUnit } = req.query;
+      const aggLabel = String(aggGroupBy).charAt(0).toUpperCase() + String(aggGroupBy).slice(1);
+      title = `${dataType === 'sales' ? 'Sales' : 'Purchases'} Analysis by ${aggLabel}`;
+      const hasResident = aggGroupBy === 'unit';
+      columns = hasResident
+        ? [
+            { header: aggLabel, key: 'group_name', width: 140 },
+            { header: 'Resident', key: 'resident_name', width: 100 },
+            { header: aggGroupBy === 'material' ? (dataType === 'sales' ? 'Client' : 'Vendor') : 'Material', key: 'sub_group', width: 100 },
+            { header: '#', key: 'record_count', width: 40 },
+            { header: 'Weight (kg)', key: 'total_weight_kg', width: 80 },
+            { header: dataType === 'sales' ? 'Revenue' : 'Cost', key: 'total_value', width: 80 },
+            { header: 'Avg $/kg', key: 'avg_price_per_kg', width: 70 },
+          ]
+        : [
+            { header: aggLabel, key: 'group_name', width: 140 },
+            { header: aggGroupBy === 'material' ? (dataType === 'sales' ? 'Client' : 'Vendor') : 'Material', key: 'sub_group', width: 100 },
+            { header: '#', key: 'record_count', width: 40 },
+            { header: 'Weight (kg)', key: 'total_weight_kg', width: 80 },
+            { header: dataType === 'sales' ? 'Revenue' : 'Cost', key: 'total_value', width: 80 },
+            { header: 'Avg $/kg', key: 'avg_price_per_kg', width: 70 },
+          ];
+
+      // Direct query approach
+      const aParams: any[] = [];
+      const apc = { n: 1 };
+
+      if (dataType === 'sales') {
+        let aWhere = ' WHERE 1=1';
+        if (locationId) { aParams.push(locationId); aWhere += ` AND s.location_id = $${apc.n++}`; }
+        if (aggCli) { aParams.push(aggCli); aWhere += ` AND s.client_id = $${apc.n++}`; }
+        if (aggMat) { aParams.push(aggMat); aWhere += ` AND s.material_category_id = $${apc.n++}`; }
+        aWhere += dateFilter('s.', startDate, endDate, aParams, apc, 'sale_date');
+
+        let selGroup: string, grpClause: string;
+        if (aggGroupBy === 'client') {
+          selGroup = `c.name AS group_name, mc.name AS sub_group`;
+          grpClause = `c.name, mc.name`;
+        } else if (aggGroupBy === 'location') {
+          selGroup = `l.name AS group_name, mc.name AS sub_group`;
+          grpClause = `l.name, mc.name`;
+        } else {
+          selGroup = `mc.name AS group_name, c.name AS sub_group`;
+          grpClause = `mc.name, c.name`;
+        }
+
+        const r = await query(`
+          SELECT ${selGroup}, COUNT(s.id) AS record_count,
+            SUM(s.weight_kg) AS total_weight_kg, SUM(s.total_amount) AS total_value,
+            AVG(s.unit_price) AS avg_price_per_kg
+          FROM sale s JOIN client c ON s.client_id = c.id
+          JOIN material_category mc ON s.material_category_id = mc.id
+          JOIN location l ON s.location_id = l.id
+          ${aWhere} GROUP BY ${grpClause} ORDER BY ${grpClause}
+        `, aParams);
+        reportData = r.rows;
+      } else {
+        let aWhere = ' WHERE 1=1';
+        if (locationId) { aParams.push(locationId); aWhere += ` AND t.location_id = $${apc.n++}`; }
+        if (aggWp) { aParams.push(aggWp); aWhere += ` AND t.waste_picker_id = $${apc.n++}`; }
+        if (aggMat) { aParams.push(aggMat); aWhere += ` AND t.material_category_id = $${apc.n++}`; }
+        if (aggApt) { aParams.push(aggApt); aWhere += ` AND t.apartment_complex_id = $${apc.n++}`; }
+        if (aggUnit) { aParams.push(aggUnit); aWhere += ` AND t.apartment_unit_id = $${apc.n++}`; }
+        aWhere += dateFilter('t.', startDate, endDate, aParams, apc);
+
+        let selGroup: string, grpClause: string;
+        if (aggGroupBy === 'vendor') {
+          selGroup = `wp.first_name || ' ' || wp.last_name AS group_name, mc.name AS sub_group`;
+          grpClause = `wp.first_name, wp.last_name, mc.name`;
+        } else if (aggGroupBy === 'source') {
+          selGroup = `COALESCE(ac.name, wp.first_name || ' ' || wp.last_name) AS group_name, mc.name AS sub_group`;
+          grpClause = `COALESCE(ac.name, wp.first_name || ' ' || wp.last_name), mc.name`;
+        } else if (aggGroupBy === 'unit') {
+          selGroup = `ac.name || ' - Unit ' || au.unit_number AS group_name, COALESCE(au.resident_name, '') AS resident_name, mc.name AS sub_group`;
+          grpClause = `ac.name, au.unit_number, au.resident_name, mc.name`;
+          aWhere += ` AND t.apartment_unit_id IS NOT NULL`;
+        } else if (aggGroupBy === 'location') {
+          selGroup = `l.name AS group_name, mc.name AS sub_group`;
+          grpClause = `l.name, mc.name`;
+        } else {
+          selGroup = `mc.name AS group_name, wp.first_name || ' ' || wp.last_name AS sub_group`;
+          grpClause = `mc.name, wp.first_name, wp.last_name`;
+        }
+
+        const r = await query(`
+          SELECT ${selGroup}, COUNT(t.id) AS record_count,
+            SUM(t.weight_kg) AS total_weight_kg, SUM(t.total_cost) AS total_value,
+            AVG(t.unit_price) AS avg_price_per_kg
+          FROM transaction t
+          JOIN material_category mc ON t.material_category_id = mc.id
+          JOIN location l ON t.location_id = l.id
+          LEFT JOIN waste_picker wp ON t.waste_picker_id = wp.id
+          LEFT JOIN apartment_complex ac ON t.apartment_complex_id = ac.id
+          LEFT JOIN apartment_unit au ON t.apartment_unit_id = au.id
+          ${aWhere} GROUP BY ${grpClause} ORDER BY ${grpClause}
+        `, aParams);
+        reportData = r.rows;
       }
     } else if (reportType === 'traceability') {
       title = 'Traceability Report';

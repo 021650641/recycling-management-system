@@ -96,6 +96,7 @@ export const reportsAPI = {
   getPurchases: (params?: any) => api.get('/reports/purchases', { params }),
   getSales: (params?: any) => api.get('/reports/sales', { params }),
   getTraceability: (params?: any) => api.get('/reports/traceability', { params }),
+  getAggregate: (params?: any) => api.get('/reports/aggregate', { params }),
   export: (params?: any) => api.get('/reports/export', { params, responseType: 'blob' }),
   emailReport: (data: any) => api.post('/reports/email', data),
   getEmailStatus: () => api.get('/reports/email-status'),

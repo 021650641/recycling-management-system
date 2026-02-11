@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { reportsAPI } from '@/lib/api';
 import { useTranslation } from 'react-i18next';
-import { Download, Calendar, TrendingUp, DollarSign, Mail, FileText, X, ShoppingCart, Users, GitBranch, RefreshCw } from 'lucide-react';
+import { Download, Calendar, TrendingUp, DollarSign, Mail, FileText, X, ShoppingCart, Users, GitBranch, RefreshCw, BarChart3 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
 import { useSettingsStore } from '@/store/settingsStore';
 import { formatDate } from '@/lib/dateFormat';
 
-type ReportTab = 'overview' | 'purchases' | 'sales' | 'traceability';
+type ReportTab = 'overview' | 'purchases' | 'sales' | 'traceability' | 'analysis';
 type ExportFormat = 'pdf' | 'csv' | 'excel';
 
 export default function Reports() {
@@ -26,6 +26,8 @@ export default function Reports() {
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [analysisDataType, setAnalysisDataType] = useState<'purchases' | 'sales'>('purchases');
+  const [analysisGroupBy, setAnalysisGroupBy] = useState('vendor');
   const exportRef = useRef<HTMLDivElement>(null);
   const [dateRange, setDateRange] = useState({
     startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
@@ -86,10 +88,14 @@ export default function Reports() {
 
   const handleExport = async (fmt: ExportFormat) => {
     try {
-      const reportTypeMap: Record<ReportTab, string> = { overview: 'purchases', purchases: 'purchases', sales: 'sales', traceability: 'traceability' };
+      const reportTypeMap: Record<ReportTab, string> = { overview: 'purchases', purchases: 'purchases', sales: 'sales', traceability: 'traceability', analysis: 'aggregate' };
       const params: any = { ...dateRange, format: fmt, reportType: reportTypeMap[activeTab], dateFormat: dfmt, timeFormat: tfmt };
       if (activeTab === 'purchases' && purchaseGroupBy !== 'detailed') params.groupBy = purchaseGroupBy;
       if (activeTab === 'sales' && salesGroupBy !== 'detailed') params.groupBy = salesGroupBy;
+      if (activeTab === 'analysis') {
+        params.dataType = analysisDataType;
+        params.groupBy = analysisGroupBy;
+      }
 
       const response = await reportsAPI.export(params);
       const extMap: Record<string, string> = { pdf: 'pdf', csv: 'csv', excel: 'xlsx' };
@@ -113,6 +119,7 @@ export default function Reports() {
     { key: 'purchases', label: t('reports.purchases'), icon: Users },
     { key: 'sales', label: t('reports.salesReport'), icon: ShoppingCart },
     { key: 'traceability', label: t('reports.traceabilityReport'), icon: GitBranch },
+    { key: 'analysis', label: 'Analysis', icon: BarChart3 },
   ];
 
   return (
@@ -200,6 +207,7 @@ export default function Reports() {
               {activeTab === 'purchases' && <PurchasesTab data={purchases} groupBy={purchaseGroupBy} setGroupBy={setPurchaseGroupBy} t={t} dfmt={dfmt} />}
               {activeTab === 'sales' && <SalesTab data={sales} groupBy={salesGroupBy} setGroupBy={setSalesGroupBy} t={t} dfmt={dfmt} />}
               {activeTab === 'traceability' && <TraceabilityTab dateRange={dateRange} refreshKey={refreshKey} t={t} dfmt={dfmt} />}
+              {activeTab === 'analysis' && <AnalysisTab dateRange={dateRange} refreshKey={refreshKey} t={t} dfmt={dfmt} tfmt={tfmt} onStateChange={(dt: string, gb: string) => { setAnalysisDataType(dt as any); setAnalysisGroupBy(gb); }} />}
             </>
           )}
         </div>
@@ -567,6 +575,163 @@ function TraceabilityTab({ dateRange, refreshKey, t, dfmt }: any) {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+type AggGroupBy = 'vendor' | 'source' | 'unit' | 'material' | 'location' | 'client';
+
+function AnalysisTab({ dateRange, refreshKey, t, onStateChange }: any) {
+  const [dataType, setDataType] = useState<'purchases' | 'sales'>('purchases');
+  const [groupBy, setGroupBy] = useState<AggGroupBy>('vendor');
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const purchaseGroups: { key: AggGroupBy; label: string }[] = [
+    { key: 'vendor', label: 'By Vendor' },
+    { key: 'source', label: 'By Source' },
+    { key: 'unit', label: 'By Unit' },
+    { key: 'material', label: 'By Material' },
+    { key: 'location', label: 'By Location' },
+  ];
+  const salesGroups: { key: AggGroupBy; label: string }[] = [
+    { key: 'client', label: 'By Client' },
+    { key: 'material', label: 'By Material' },
+    { key: 'location', label: 'By Location' },
+  ];
+
+  const groupOptions = dataType === 'sales' ? salesGroups : purchaseGroups;
+
+  // Reset groupBy when dataType changes
+  useEffect(() => {
+    const newGb = dataType === 'sales' ? 'client' : 'vendor';
+    setGroupBy(newGb);
+    onStateChange?.(dataType, newGb);
+  }, [dataType]);
+
+  // Sync state changes to parent for export
+  useEffect(() => {
+    onStateChange?.(dataType, groupBy);
+  }, [groupBy]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const res = await reportsAPI.getAggregate({ ...dateRange, dataType, groupBy });
+      setData(res.data?.rows || []);
+    } catch {
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [dateRange.startDate, dateRange.endDate, dataType, groupBy, refreshKey]);
+
+  // Compute grouped totals for subtotal rows
+  const groups: Record<string, any[]> = {};
+  for (const row of data) {
+    const key = row.group_name || 'Unknown';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(row);
+  }
+
+  const subGroupLabel = groupBy === 'material'
+    ? (dataType === 'sales' ? 'Client' : 'Vendor')
+    : 'Material';
+  const valueLabel = dataType === 'sales' ? 'Revenue' : 'Cost';
+  const groupLabel = groupBy.charAt(0).toUpperCase() + groupBy.slice(1);
+
+  // Grand totals
+  const grandWeight = data.reduce((s, r) => s + parseFloat(r.total_weight_kg || 0), 0);
+  const grandValue = data.reduce((s, r) => s + parseFloat(r.total_value || 0), 0);
+  const grandCount = data.reduce((s, r) => s + parseInt(r.record_count || 0), 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-4">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Data</label>
+          <GroupToggle value={dataType} onChange={(v: any) => setDataType(v)} options={[
+            { key: 'purchases', label: t('reports.purchases') },
+            { key: 'sales', label: t('reports.salesReport') },
+          ]} />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Group by</label>
+          <GroupToggle value={groupBy} onChange={(v: any) => setGroupBy(v)} options={groupOptions} />
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>
+      ) : data.length === 0 ? (
+        <div className="text-center py-12 text-gray-500">{t('common.noData')}</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{groupLabel}</th>
+                {groupBy === 'unit' && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Resident</th>}
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{subGroupLabel}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">#</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Weight (kg)</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{valueLabel}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Avg $/kg</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {Object.entries(groups).map(([groupName, rows]) => {
+                const grpWeight = rows.reduce((s, r) => s + parseFloat(r.total_weight_kg || 0), 0);
+                const grpValue = rows.reduce((s, r) => s + parseFloat(r.total_value || 0), 0);
+                const grpCount = rows.reduce((s, r) => s + parseInt(r.record_count || 0), 0);
+
+                return (
+                  <>{rows.map((row, i) => (
+                    <tr key={`${groupName}-${i}`} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 text-sm">
+                        {i === 0 ? <span className="font-semibold text-gray-900">{groupName}</span> : ''}
+                      </td>
+                      {groupBy === 'unit' && <td className="px-4 py-2 text-sm text-gray-500">{i === 0 ? row.resident_name || '' : ''}</td>}
+                      <td className="px-4 py-2 text-sm">{row.sub_group || '-'}</td>
+                      <td className="px-4 py-2 text-sm text-right">{row.record_count}</td>
+                      <td className="px-4 py-2 text-sm text-right">{parseFloat(row.total_weight_kg).toFixed(1)}</td>
+                      <td className="px-4 py-2 text-sm text-right">${parseFloat(row.total_value).toFixed(2)}</td>
+                      <td className="px-4 py-2 text-sm text-right">${parseFloat(row.avg_price_per_kg).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                  {rows.length > 1 && (
+                    <tr key={`${groupName}-total`} className="bg-gray-50">
+                      <td className="px-4 py-2 text-sm font-bold text-gray-700">{groupName} Total</td>
+                      {groupBy === 'unit' && <td />}
+                      <td />
+                      <td className="px-4 py-2 text-sm text-right font-bold">{grpCount}</td>
+                      <td className="px-4 py-2 text-sm text-right font-bold">{grpWeight.toFixed(1)}</td>
+                      <td className="px-4 py-2 text-sm text-right font-bold">${grpValue.toFixed(2)}</td>
+                      <td />
+                    </tr>
+                  )}
+                  </>
+                );
+              })}
+            </tbody>
+            <tfoot className="border-t-2 border-gray-300">
+              <tr className="bg-gray-100 font-bold">
+                <td className="px-4 py-3 text-sm">Grand Total</td>
+                {groupBy === 'unit' && <td />}
+                <td className="px-4 py-3 text-sm text-gray-500">{Object.keys(groups).length} {groupLabel.toLowerCase()}s</td>
+                <td className="px-4 py-3 text-sm text-right">{grandCount}</td>
+                <td className="px-4 py-3 text-sm text-right">{grandWeight.toFixed(1)}</td>
+                <td className="px-4 py-3 text-sm text-right">${grandValue.toFixed(2)}</td>
+                <td className="px-4 py-3 text-sm text-right">{grandWeight > 0 ? `$${(grandValue / grandWeight).toFixed(2)}` : '-'}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
