@@ -3,6 +3,7 @@ import { query } from '../db';
 import { authenticate, authorize } from '../middleware/auth';
 import { generatePDF, generateExcel, generateCSV } from '../services/exportService';
 import { sendReportEmail, isEmailConfigured } from '../services/emailService';
+import { formatDate, formatDateTime, formatReportDates } from '../utils/dateFormat';
 
 const router = Router();
 router.use(authenticate);
@@ -395,12 +396,14 @@ router.get('/pending-payments', authorize('admin', 'manager'), async (req, res, 
 // ─── Export Report ───
 router.get('/export', async (req: any, res, next): Promise<any> => {
   try {
-    const { reportType = 'purchases', format = 'csv', startDate, endDate, locationId, wastePickerId, clientId, groupBy } = req.query;
+    const { reportType = 'purchases', format = 'csv', startDate, endDate, locationId, wastePickerId, clientId, groupBy, dateFormat = 'DD/MM/YYYY', timeFormat = '24h' } = req.query;
 
     let reportData: any[];
     let title = '';
     let columns: { header: string; key: string; width?: number }[] = [];
-    const dateSubtitle = startDate && endDate ? `${startDate} to ${endDate}` : 'All time';
+    const fmtStart = startDate ? formatDate(startDate, dateFormat as string) : '';
+    const fmtEnd = endDate ? formatDate(endDate, dateFormat as string) : '';
+    const dateSubtitle = fmtStart && fmtEnd ? `${fmtStart} to ${fmtEnd}` : 'All time';
 
     if (reportType === 'purchases' || reportType === 'transactions') {
       title = 'Purchases Report';
@@ -546,7 +549,12 @@ router.get('/export', async (req: any, res, next): Promise<any> => {
       return res.status(400).json({ error: `Unknown report type: ${reportType}` });
     }
 
-    const data = { title, subtitle: dateSubtitle, columns, rows: reportData || [] };
+    // Format date columns before export
+    const dateColumns = reportType === 'sales' ? ['sale_date'] : ['transaction_date'];
+    formatReportDates(reportData || [], dateColumns, dateFormat as string);
+
+    const generatedAt = formatDateTime(new Date(), dateFormat as string, timeFormat as string);
+    const data = { title, subtitle: dateSubtitle, columns, rows: reportData || [], generatedAt };
 
     if (format === 'pdf') {
       const buffer = await generatePDF(data);
@@ -579,13 +587,15 @@ router.post('/email', authorize('admin', 'manager'), async (req: any, res, next)
       return res.status(400).json({ error: 'Email is not configured. Contact your administrator to set SMTP settings.' });
     }
 
-    const { to, reportType = 'purchases', format = 'pdf', startDate, endDate, subject, message } = req.body;
+    const { to, reportType = 'purchases', format = 'pdf', startDate, endDate, subject, message, dateFormat = 'DD/MM/YYYY', timeFormat = '24h' } = req.body;
 
     if (!to) {
       return res.status(400).json({ error: 'Recipient email address is required' });
     }
 
-    const dateSubtitle = startDate && endDate ? `${startDate} to ${endDate}` : 'All time';
+    const fmtStart = startDate ? formatDate(startDate, dateFormat) : '';
+    const fmtEnd = endDate ? formatDate(endDate, dateFormat) : '';
+    const dateSubtitle = fmtStart && fmtEnd ? `${fmtStart} to ${fmtEnd}` : 'All time';
     const title = reportType === 'sales' ? 'Sales Report' : reportType === 'traceability' ? 'Traceability Report' : 'Purchases Report';
     let columns: any[] = [];
     let reportData: any[] = [];
@@ -629,7 +639,12 @@ router.post('/email', authorize('admin', 'manager'), async (req: any, res, next)
       reportData = result.rows;
     }
 
-    const data = { title, subtitle: dateSubtitle, columns, rows: reportData };
+    // Format date columns for email reports
+    const emailDateCols = reportType === 'sales' ? ['sale_date'] : ['transaction_date'];
+    formatReportDates(reportData, emailDateCols, dateFormat);
+
+    const emailGeneratedAt = formatDateTime(new Date(), dateFormat, timeFormat);
+    const data = { title, subtitle: dateSubtitle, columns, rows: reportData, generatedAt: emailGeneratedAt };
 
     let attachment: { filename: string; content: Buffer | string; contentType: string };
     if (format === 'excel' || format === 'xlsx') {

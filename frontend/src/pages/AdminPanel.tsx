@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { materialsAPI, locationsAPI, settingsAPI } from '@/lib/api';
 import { api } from '@/lib/api';
-import { Plus, Edit2, Trash2, Save, X, Mail } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Mail, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useSettingsStore, type DateFormat, type TimeFormat } from '@/store/settingsStore';
 
-type TabType = 'materials' | 'locations' | 'pricing' | 'email';
+type TabType = 'materials' | 'locations' | 'pricing' | 'email' | 'display';
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<TabType>('materials');
@@ -318,6 +319,17 @@ export default function AdminPanel() {
             <Mail className="w-4 h-4" />
             Email Settings
           </button>
+          <button
+            onClick={() => setActiveTab('display')}
+            className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-1.5 ${
+              activeTab === 'display'
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            Display Settings
+          </button>
         </nav>
       </div>
 
@@ -330,6 +342,7 @@ export default function AdminPanel() {
           {activeTab === 'locations' && renderLocationsTab()}
           {activeTab === 'pricing' && renderPricingTab()}
           {activeTab === 'email' && <EmailSettingsTab />}
+          {activeTab === 'display' && <DisplaySettingsTab />}
         </>
       )}
     </div>
@@ -652,6 +665,78 @@ function EmailSettingsTab() {
             <Mail className="w-4 h-4" />
             {testing ? 'Sending...' : 'Send Test'}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DisplaySettingsTab() {
+  const { dateFormat, timeFormat, setDateFormat, setTimeFormat } = useSettingsStore();
+
+  const dateFormats: { value: DateFormat; label: string; example: string }[] = [
+    { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY', example: '11/02/2026' },
+    { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY', example: '02/11/2026' },
+    { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD', example: '2026-02-11' },
+  ];
+
+  const timeFormats: { value: TimeFormat; label: string; example: string }[] = [
+    { value: '24h', label: '24-hour', example: '16:30' },
+    { value: '12h', label: '12-hour', example: '4:30 PM' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900">Display Settings</h2>
+        <p className="text-sm text-gray-500 mt-1">Configure how dates and times are displayed throughout the application and in exported reports</p>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">Date Format</label>
+          <div className="space-y-2">
+            {dateFormats.map((fmt) => (
+              <label key={fmt.value} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                dateFormat === fmt.value ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:bg-gray-50'
+              }`}>
+                <input
+                  type="radio"
+                  name="dateFormat"
+                  checked={dateFormat === fmt.value}
+                  onChange={() => setDateFormat(fmt.value)}
+                  className="text-primary-600 focus:ring-primary-500"
+                />
+                <span className="font-medium text-gray-900">{fmt.label}</span>
+                <span className="text-sm text-gray-500 ml-auto">{fmt.example}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">Time Format</label>
+          <div className="space-y-2">
+            {timeFormats.map((fmt) => (
+              <label key={fmt.value} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                timeFormat === fmt.value ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:bg-gray-50'
+              }`}>
+                <input
+                  type="radio"
+                  name="timeFormat"
+                  checked={timeFormat === fmt.value}
+                  onChange={() => setTimeFormat(fmt.value)}
+                  className="text-primary-600 focus:ring-primary-500"
+                />
+                <span className="font-medium text-gray-900">{fmt.label}</span>
+                <span className="text-sm text-gray-500 ml-auto">{fmt.example}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="pt-4 border-t border-gray-200">
+          <p className="text-xs text-gray-500">Settings are saved automatically and apply to all reports, exports, and date displays.</p>
         </div>
       </div>
     </div>

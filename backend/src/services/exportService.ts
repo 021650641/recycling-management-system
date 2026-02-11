@@ -7,6 +7,7 @@ interface ReportData {
   columns: { header: string; key: string; width?: number }[];
   rows: Record<string, any>[];
   summary?: Record<string, string | number>;
+  generatedAt?: string;
 }
 
 export async function generatePDF(data: ReportData): Promise<Buffer> {
@@ -26,7 +27,7 @@ export async function generatePDF(data: ReportData): Promise<Buffer> {
       doc.fontSize(10).font('Helvetica').text(data.subtitle, { align: 'center' });
     }
     doc.moveDown(0.5);
-    doc.fontSize(8).font('Helvetica').text(`Generated: ${new Date().toLocaleString()}`, { align: 'right' });
+    doc.fontSize(8).font('Helvetica').text(`Generated: ${data.generatedAt || new Date().toLocaleString()}`, { align: 'right' });
     doc.moveDown(1);
 
     // Summary section

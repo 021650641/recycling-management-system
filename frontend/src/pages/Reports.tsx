@@ -5,6 +5,8 @@ import { Download, Calendar, TrendingUp, DollarSign, Mail, FileText, X, Shopping
 import { format, subDays } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
+import { useSettingsStore } from '@/store/settingsStore';
+import { formatDate } from '@/lib/dateFormat';
 
 type ReportTab = 'overview' | 'purchases' | 'sales' | 'traceability';
 type ExportFormat = 'pdf' | 'csv' | 'excel';
@@ -80,10 +82,12 @@ export default function Reports() {
     }
   };
 
+  const { dateFormat: dfmt, timeFormat: tfmt } = useSettingsStore();
+
   const handleExport = async (fmt: ExportFormat) => {
     try {
       const reportTypeMap: Record<ReportTab, string> = { overview: 'purchases', purchases: 'purchases', sales: 'sales', traceability: 'traceability' };
-      const params: any = { ...dateRange, format: fmt, reportType: reportTypeMap[activeTab] };
+      const params: any = { ...dateRange, format: fmt, reportType: reportTypeMap[activeTab], dateFormat: dfmt, timeFormat: tfmt };
       if (activeTab === 'purchases' && purchaseGroupBy !== 'detailed') params.groupBy = purchaseGroupBy;
       if (activeTab === 'sales' && salesGroupBy !== 'detailed') params.groupBy = salesGroupBy;
 
@@ -192,16 +196,16 @@ export default function Reports() {
             <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>
           ) : (
             <>
-              {activeTab === 'overview' && <OverviewTab summary={summary} trends={trends} pendingPayments={pendingPayments} t={t} />}
-              {activeTab === 'purchases' && <PurchasesTab data={purchases} groupBy={purchaseGroupBy} setGroupBy={setPurchaseGroupBy} t={t} />}
-              {activeTab === 'sales' && <SalesTab data={sales} groupBy={salesGroupBy} setGroupBy={setSalesGroupBy} t={t} />}
-              {activeTab === 'traceability' && <TraceabilityTab dateRange={dateRange} refreshKey={refreshKey} t={t} />}
+              {activeTab === 'overview' && <OverviewTab summary={summary} trends={trends} pendingPayments={pendingPayments} t={t} dfmt={dfmt} />}
+              {activeTab === 'purchases' && <PurchasesTab data={purchases} groupBy={purchaseGroupBy} setGroupBy={setPurchaseGroupBy} t={t} dfmt={dfmt} />}
+              {activeTab === 'sales' && <SalesTab data={sales} groupBy={salesGroupBy} setGroupBy={setSalesGroupBy} t={t} dfmt={dfmt} />}
+              {activeTab === 'traceability' && <TraceabilityTab dateRange={dateRange} refreshKey={refreshKey} t={t} dfmt={dfmt} />}
             </>
           )}
         </div>
       </div>
 
-      {showEmailDialog && <EmailDialog t={t} emailConfigured={emailConfigured} activeTab={activeTab} dateRange={dateRange} onClose={() => setShowEmailDialog(false)} />}
+      {showEmailDialog && <EmailDialog t={t} emailConfigured={emailConfigured} activeTab={activeTab} dateRange={dateRange} dfmt={dfmt} tfmt={tfmt} onClose={() => setShowEmailDialog(false)} />}
     </div>
   );
 }
@@ -215,7 +219,7 @@ function StatCard({ label, value, color = 'text-gray-900' }: { label: string; va
   );
 }
 
-function OverviewTab({ summary, trends, pendingPayments, t }: any) {
+function OverviewTab({ summary, trends, pendingPayments, t, dfmt }: any) {
   const profit = (summary?.totalSalesRevenue || 0) - (summary?.totalPurchaseCost || 0);
   return (
     <div className="space-y-6">
@@ -289,7 +293,7 @@ function OverviewTab({ summary, trends, pendingPayments, t }: any) {
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">{t('common.noData')}</td></tr>
               ) : pendingPayments.map((p: any, i: number) => (
                 <tr key={p.transaction_id || i} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm">{p.transaction_date ? format(new Date(p.transaction_date), 'MMM dd, yyyy') : '-'}</td>
+                  <td className="px-4 py-3 text-sm">{formatDate(p.transaction_date, dfmt)}</td>
                   <td className="px-4 py-3 text-sm">{p.waste_picker_name || '-'}</td>
                   <td className="px-4 py-3 text-sm">{p.material_category || '-'}</td>
                   <td className="px-4 py-3 text-sm font-semibold">${(parseFloat(p.total_cost) || 0).toFixed(2)}</td>
@@ -323,7 +327,7 @@ function GroupToggle({ options, value, onChange }: { options: { key: string; lab
   );
 }
 
-function PurchasesTab({ data, groupBy, setGroupBy, t }: any) {
+function PurchasesTab({ data, groupBy, setGroupBy, t, dfmt }: any) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -384,7 +388,7 @@ function PurchasesTab({ data, groupBy, setGroupBy, t }: any) {
                   <td className="px-4 py-3 text-sm font-semibold">${parseFloat(row.total_cost).toFixed(2)}</td>
                 </>}
                 {groupBy === 'detailed' && <>
-                  <td className="px-4 py-3 text-sm">{row.transaction_date ? format(new Date(row.transaction_date), 'MMM dd') : '-'}</td>
+                  <td className="px-4 py-3 text-sm">{formatDate(row.transaction_date, dfmt)}</td>
                   <td className="px-4 py-3 text-sm">{row.waste_picker_name || '-'}</td>
                   <td className="px-4 py-3 text-sm">{row.material_name}</td>
                   <td className="px-4 py-3 text-sm">{parseFloat(row.weight_kg).toFixed(1)}</td>
@@ -400,7 +404,7 @@ function PurchasesTab({ data, groupBy, setGroupBy, t }: any) {
   );
 }
 
-function SalesTab({ data, groupBy, setGroupBy, t }: any) {
+function SalesTab({ data, groupBy, setGroupBy, t, dfmt }: any) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -462,7 +466,7 @@ function SalesTab({ data, groupBy, setGroupBy, t }: any) {
                   <td className="px-4 py-3 text-sm font-semibold text-green-600">${parseFloat(row.total_revenue).toFixed(2)}</td>
                 </>}
                 {groupBy === 'detailed' && <>
-                  <td className="px-4 py-3 text-sm">{row.sale_date ? format(new Date(row.sale_date), 'MMM dd') : '-'}</td>
+                  <td className="px-4 py-3 text-sm">{formatDate(row.sale_date, dfmt)}</td>
                   <td className="px-4 py-3 text-sm">{row.client_name}</td>
                   <td className="px-4 py-3 text-sm">{row.material_name}</td>
                   <td className="px-4 py-3 text-sm">{parseFloat(row.weight_kg).toFixed(1)}</td>
@@ -479,7 +483,7 @@ function SalesTab({ data, groupBy, setGroupBy, t }: any) {
   );
 }
 
-function TraceabilityTab({ dateRange, refreshKey, t }: any) {
+function TraceabilityTab({ dateRange, refreshKey, t, dfmt }: any) {
   const [data, setData] = useState<any>({ transactions: [], summary: [] });
   const [loading, setLoading] = useState(true);
   const dateKey = `${dateRange.startDate}_${dateRange.endDate}`;
@@ -550,7 +554,7 @@ function TraceabilityTab({ dateRange, refreshKey, t }: any) {
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">{t('common.noData')}</td></tr>
               ) : (data.transactions || []).map((row: any, i: number) => (
                 <tr key={i} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm">{row.transaction_date ? format(new Date(row.transaction_date), 'MMM dd') : '-'}</td>
+                  <td className="px-4 py-3 text-sm">{formatDate(row.transaction_date, dfmt)}</td>
                   <td className="px-4 py-3 text-sm">{row.source_name || '-'}</td>
                   <td className="px-4 py-3 text-sm">{row.waste_picker_name || '-'}</td>
                   <td className="px-4 py-3 text-sm">{row.material_category}</td>
@@ -581,7 +585,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function EmailDialog({ t, emailConfigured, activeTab, dateRange, onClose }: any) {
+function EmailDialog({ t, emailConfigured, activeTab, dateRange, dfmt, tfmt, onClose }: any) {
   const [sending, setSending] = useState(false);
   const [form, setForm] = useState({
     to: '', subject: '', message: '', format: 'pdf',
@@ -592,7 +596,7 @@ function EmailDialog({ t, emailConfigured, activeTab, dateRange, onClose }: any)
     if (!form.to) { toast.error(t('common.required')); return; }
     setSending(true);
     try {
-      await reportsAPI.emailReport({ ...form, ...dateRange });
+      await reportsAPI.emailReport({ ...form, ...dateRange, dateFormat: dfmt, timeFormat: tfmt });
       toast.success(t('reports.emailDialog.sent'));
       onClose();
     } catch (error: any) {

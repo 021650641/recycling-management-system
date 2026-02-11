@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { api, wastePickersAPI, apartmentsAPI, materialsAPI } from '@/lib/api';
 import { Search, GitBranch, Filter } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useSettingsStore } from '@/store/settingsStore';
+import { formatDate } from '@/lib/dateFormat';
 
 interface TraceTransaction {
   transaction_id: string;
@@ -42,6 +44,7 @@ interface TraceSummary {
 }
 
 export default function Traceability() {
+  const { dateFormat: dfmt } = useSettingsStore();
   const [transactions, setTransactions] = useState<TraceTransaction[]>([]);
   const [summary, setSummary] = useState<TraceSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -288,9 +291,9 @@ export default function Traceability() {
                   <div>
                     <p className="text-gray-500">Period</p>
                     <p className="font-medium text-xs">
-                      {s.first_transaction ? new Date(s.first_transaction).toLocaleDateString() : '-'}
+                      {formatDate(s.first_transaction, dfmt)}
                       {' - '}
-                      {s.last_transaction ? new Date(s.last_transaction).toLocaleDateString() : '-'}
+                      {formatDate(s.last_transaction, dfmt)}
                     </p>
                   </div>
                 </div>
@@ -327,7 +330,7 @@ export default function Traceability() {
                   {transactions.map((t) => (
                     <tr key={t.transaction_id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        {t.transaction_date ? new Date(t.transaction_date).toLocaleDateString() : '-'}
+                        {formatDate(t.transaction_date, dfmt)}
                       </td>
                       <td className="px-4 py-3 text-sm font-mono text-gray-900">{t.transaction_number}</td>
                       <td className="px-4 py-3 text-sm text-gray-900">
