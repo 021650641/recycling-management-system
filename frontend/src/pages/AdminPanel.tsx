@@ -324,8 +324,9 @@ function PricingTab({ materials, locations, initialPrices, onReload, loading: pa
       const response = await pricesAPI.getAll(params);
       const data = Array.isArray(response.data) ? response.data : response.data?.prices || [];
       setAllPrices(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load prices:', error);
+      toast.error('Failed to load prices. Check if the database migration has been applied.');
     } finally {
       setLoadingAll(false);
     }
