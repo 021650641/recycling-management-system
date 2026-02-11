@@ -94,20 +94,47 @@ const routeModules = [
 ];
 console.log(`Registered ${routeModules.length} route modules under ${config.apiPrefix}`);
 
-// Start server
-const server = app.listen(config.port, () => {
-  console.log(`Server running on port ${config.port}`);
-  console.log(`API available at http://localhost:${config.port}${config.apiPrefix}`);
-  console.log(`Environment: ${config.nodeEnv}`);
-});
+// Start server with EADDRINUSE retry logic
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000;
+let retryCount = 0;
+
+function startServer(): void {
+  const server_instance = app.listen(config.port, () => {
+    console.log(`Server running on port ${config.port}`);
+    console.log(`API available at http://localhost:${config.port}${config.apiPrefix}`);
+    console.log(`Environment: ${config.nodeEnv}`);
+  });
+
+  server_instance.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE' && retryCount < MAX_RETRIES) {
+      retryCount++;
+      console.warn(`Port ${config.port} in use, retrying (${retryCount}/${MAX_RETRIES}) in ${RETRY_DELAY_MS}ms...`);
+      setTimeout(() => startServer(), RETRY_DELAY_MS);
+    } else {
+      console.error(`Fatal: ${err.message}`);
+      process.exit(1);
+    }
+  });
+
+  // Store reference for graceful shutdown
+  currentServer = server_instance;
+}
+
+let currentServer: ReturnType<typeof app.listen>;
+startServer();
 
 // Graceful shutdown
 const gracefulShutdown = (signal: string) => {
   console.log(`\n${signal} received, shutting down gracefully...`);
-  server.close(() => {
-    console.log('Server closed');
+  if (currentServer) {
+    currentServer.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  } else {
     process.exit(0);
-  });
+  }
 
   setTimeout(() => {
     console.error('Forcing shutdown after timeout');

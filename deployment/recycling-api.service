@@ -9,6 +9,7 @@ Type=simple
 User=deploy
 Group=deploy
 WorkingDirectory=/var/www/recycling/backend
+ExecStartPre=/bin/sh -c 'fuser -k 5000/tcp 2>/dev/null; sleep 1; exit 0'
 ExecStart=/usr/bin/node dist/server.js
 Restart=on-failure
 RestartSec=5
