@@ -31,8 +31,14 @@ export default function Reports() {
 
   useEffect(() => {
     reportsAPI.getEmailStatus().then(res => setEmailConfigured(res.data?.configured)).catch(() => {});
-    loadReports();
   }, []);
+
+  // Load data when tab changes
+  useEffect(() => {
+    if (activeTab !== 'traceability') {
+      loadReports();
+    }
+  }, [activeTab, purchaseGroupBy, salesGroupBy]);
 
   // Close export menu when clicking outside
   useEffect(() => {

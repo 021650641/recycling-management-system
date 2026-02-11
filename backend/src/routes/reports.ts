@@ -12,11 +12,11 @@ function dateFilter(prefix: string, startDate: any, endDate: any, params: any[],
   let clause = '';
   if (startDate) {
     params.push(startDate);
-    clause += ` AND ${prefix}${dateCol} >= $${pc.n++}`;
+    clause += ` AND ${prefix}${dateCol}::date >= $${pc.n++}::date`;
   }
   if (endDate) {
     params.push(endDate);
-    clause += ` AND ${prefix}${dateCol} <= $${pc.n++}`;
+    clause += ` AND ${prefix}${dateCol}::date <= $${pc.n++}::date`;
   }
   return clause;
 }
@@ -266,9 +266,9 @@ router.get('/traceability', async (req, res, next) => {
     if (unitId) { params.push(unitId); where += ` AND t.apartment_unit_id = $${paramCount++}`; }
     if (wastePickerId) { params.push(wastePickerId); where += ` AND t.waste_picker_id = $${paramCount++}`; }
     if (materialId) { params.push(materialId); where += ` AND t.material_category_id = $${paramCount++}`; }
-    if (startDate) { params.push(startDate); where += ` AND t.transaction_date >= $${paramCount++}`; }
+    if (startDate) { params.push(startDate); where += ` AND t.transaction_date::date >= $${paramCount++}::date`; }
     else if (!endDate) { params.push(days); where += ` AND t.transaction_date >= CURRENT_DATE - ($${paramCount++} || ' days')::INTERVAL`; }
-    if (endDate) { params.push(endDate); where += ` AND t.transaction_date <= $${paramCount++}`; }
+    if (endDate) { params.push(endDate); where += ` AND t.transaction_date::date <= $${paramCount++}::date`; }
 
     const result = await query(`
       SELECT
@@ -338,9 +338,9 @@ router.get('/trends', async (req: any, res, next) => {
 
     let where = ' WHERE 1=1';
     if (locationId) { params.push(locationId); where += ` AND t.location_id = $${pc.n++}`; }
-    if (startDate) { params.push(startDate); where += ` AND t.transaction_date >= $${pc.n++}`; }
+    if (startDate) { params.push(startDate); where += ` AND t.transaction_date::date >= $${pc.n++}::date`; }
     else { params.push(days); where += ` AND t.transaction_date >= CURRENT_DATE - ($${pc.n++} || ' days')::INTERVAL`; }
-    if (endDate) { params.push(endDate); where += ` AND t.transaction_date <= $${pc.n++}`; }
+    if (endDate) { params.push(endDate); where += ` AND t.transaction_date::date <= $${pc.n++}::date`; }
 
     const result = await query(`
       SELECT
