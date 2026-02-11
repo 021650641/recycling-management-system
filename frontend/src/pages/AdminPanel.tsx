@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { materialsAPI, locationsAPI } from '@/lib/api';
+import { materialsAPI, locationsAPI, settingsAPI } from '@/lib/api';
 import { api } from '@/lib/api';
-import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-type TabType = 'materials' | 'locations' | 'pricing';
+type TabType = 'materials' | 'locations' | 'pricing' | 'email';
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<TabType>('materials');
@@ -307,6 +307,17 @@ export default function AdminPanel() {
           >
             Pricing
           </button>
+          <button
+            onClick={() => setActiveTab('email')}
+            className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-1.5 ${
+              activeTab === 'email'
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Mail className="w-4 h-4" />
+            Email Settings
+          </button>
         </nav>
       </div>
 
@@ -318,6 +329,7 @@ export default function AdminPanel() {
           {activeTab === 'materials' && renderMaterialsTab()}
           {activeTab === 'locations' && renderLocationsTab()}
           {activeTab === 'pricing' && renderPricingTab()}
+          {activeTab === 'email' && <EmailSettingsTab />}
         </>
       )}
     </div>
@@ -472,6 +484,177 @@ function LocationForm({ item, onSave, onCancel }: any) {
         </button>
       </div>
     </form>
+  );
+}
+
+function EmailSettingsTab() {
+  const [smtpSettings, setSmtpSettings] = useState({
+    host: '',
+    port: '587',
+    user: '',
+    password: '',
+    from: '',
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    settingsAPI.get('smtp')
+      .then(res => {
+        const data = res.data;
+        if (data && Object.keys(data).length > 0) {
+          setSmtpSettings({
+            host: data.host || '',
+            port: data.port || '587',
+            user: data.user || '',
+            password: data.password || '',
+            from: data.from || '',
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await settingsAPI.save('smtp', smtpSettings);
+      toast.success('Email settings saved');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!testEmail) {
+      toast.error('Enter a test email address');
+      return;
+    }
+    setTesting(true);
+    try {
+      await api.post('/reports/email', {
+        to: testEmail,
+        subject: 'CIVICycle Test Email',
+        message: 'This is a test email from CIVICycle to verify your SMTP configuration is working.',
+        reportType: 'purchases',
+        format: 'csv',
+      });
+      toast.success('Test email sent successfully!');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to send test email');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  if (loading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900">Email (SMTP) Settings</h2>
+        <p className="text-sm text-gray-500 mt-1">Configure email to send reports and notifications</p>
+      </div>
+
+      <form onSubmit={handleSave} className="bg-white p-6 rounded-lg shadow space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Host *</label>
+            <input
+              type="text"
+              value={smtpSettings.host}
+              onChange={(e) => setSmtpSettings({ ...smtpSettings, host: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              placeholder="smtp.gmail.com"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Port *</label>
+            <input
+              type="number"
+              value={smtpSettings.port}
+              onChange={(e) => setSmtpSettings({ ...smtpSettings, port: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              placeholder="587"
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">Usually 587 (TLS) or 465 (SSL)</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Username / Email *</label>
+            <input
+              type="text"
+              value={smtpSettings.user}
+              onChange={(e) => setSmtpSettings({ ...smtpSettings, user: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              placeholder="your-email@gmail.com"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
+            <input
+              type="password"
+              value={smtpSettings.password}
+              onChange={(e) => setSmtpSettings({ ...smtpSettings, password: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              placeholder="App password or SMTP password"
+              required
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">From Address</label>
+            <input
+              type="text"
+              value={smtpSettings.from}
+              onChange={(e) => setSmtpSettings({ ...smtpSettings, from: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              placeholder="CIVICycle <noreply@example.com> (optional, defaults to username)"
+            />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+          >
+            <Save className="w-4 h-4" />
+            {saving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
+      </form>
+
+      {/* Test Email */}
+      <div className="bg-white p-6 rounded-lg shadow space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Test Email Configuration</h3>
+        <p className="text-sm text-gray-500">Send a test email to verify your SMTP settings are working</p>
+        <div className="flex gap-2">
+          <input
+            type="email"
+            value={testEmail}
+            onChange={(e) => setTestEmail(e.target.value)}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+            placeholder="test@example.com"
+          />
+          <button
+            onClick={handleTestEmail}
+            disabled={testing || !smtpSettings.host}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+          >
+            <Mail className="w-4 h-4" />
+            {testing ? 'Sending...' : 'Send Test'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

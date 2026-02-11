@@ -1,14 +1,59 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config';
+import { query } from '../db';
 
 let transporter: nodemailer.Transporter | null = null;
+let cachedSmtpConfig: any = null;
 
-function getTransporter(): nodemailer.Transporter {
-  if (!transporter) {
-    const smtpConfig = (config as any).smtp;
-    if (!smtpConfig?.host) {
-      throw new Error('SMTP not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD environment variables.');
+async function getSmtpConfig(): Promise<any> {
+  if (cachedSmtpConfig) return cachedSmtpConfig;
+
+  // Try loading from database first
+  try {
+    const result = await query(
+      "SELECT key, value FROM app_settings WHERE category = 'smtp'"
+    );
+    if (result.rows.length > 0) {
+      const dbSettings: Record<string, string> = {};
+      for (const row of result.rows) {
+        dbSettings[row.key] = row.value;
+      }
+      if (dbSettings.host) {
+        cachedSmtpConfig = {
+          host: dbSettings.host,
+          port: parseInt(dbSettings.port || '587', 10),
+          user: dbSettings.user || '',
+          password: dbSettings.password || '',
+          from: dbSettings.from || '',
+        };
+        return cachedSmtpConfig;
+      }
     }
+  } catch {
+    // Table may not exist yet, fall through to env vars
+  }
+
+  // Fall back to env vars
+  const envConfig = (config as any).smtp;
+  if (envConfig?.host) {
+    cachedSmtpConfig = envConfig;
+  }
+  return cachedSmtpConfig;
+}
+
+// Clear cached config so changes take effect
+export function clearSmtpCache(): void {
+  transporter = null;
+  cachedSmtpConfig = null;
+}
+
+async function getTransporter(): Promise<nodemailer.Transporter> {
+  const smtpConfig = await getSmtpConfig();
+  if (!smtpConfig?.host) {
+    throw new Error('SMTP not configured. Configure email settings in Admin Panel or set SMTP environment variables.');
+  }
+
+  if (!transporter) {
     transporter = nodemailer.createTransport({
       host: smtpConfig.host,
       port: smtpConfig.port,
@@ -36,8 +81,8 @@ interface SendReportEmailOptions {
 }
 
 export async function sendReportEmail(options: SendReportEmailOptions): Promise<void> {
-  const transport = getTransporter();
-  const smtpConfig = (config as any).smtp;
+  const transport = await getTransporter();
+  const smtpConfig = await getSmtpConfig();
 
   await transport.sendMail({
     from: smtpConfig.from || `CIVICycle <${smtpConfig.user}>`,
@@ -64,7 +109,7 @@ export async function sendReportEmail(options: SendReportEmailOptions): Promise<
   });
 }
 
-export function isEmailConfigured(): boolean {
-  const smtpConfig = (config as any).smtp;
+export async function isEmailConfigured(): Promise<boolean> {
+  const smtpConfig = await getSmtpConfig();
   return !!(smtpConfig?.host);
 }

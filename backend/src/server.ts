@@ -19,6 +19,7 @@ import clientRoutes from './routes/clients';
 import salesRoutes from './routes/sales';
 import syncRoutes from './routes/sync';
 import userRoutes from './routes/users';
+import settingsRoutes from './routes/settings';
 
 const app = express();
 
@@ -57,6 +58,7 @@ apiRouter.use('/clients', clientRoutes);
 apiRouter.use('/sales', salesRoutes);
 apiRouter.use('/sync', syncRoutes);
 apiRouter.use('/users', userRoutes);
+apiRouter.use('/settings', settingsRoutes);
 
 app.use(config.apiPrefix, apiRouter);
 

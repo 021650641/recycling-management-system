@@ -44,7 +44,7 @@ interface TraceSummary {
 export default function Traceability() {
   const [transactions, setTransactions] = useState<TraceTransaction[]>([]);
   const [summary, setSummary] = useState<TraceSummary[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(true);
 
   const [wastePickers, setWastePickers] = useState<any[]>([]);
@@ -64,6 +64,7 @@ export default function Traceability() {
 
   useEffect(() => {
     loadFilterOptions();
+    handleSearch();
   }, []);
 
   // Load units when apartment filter changes

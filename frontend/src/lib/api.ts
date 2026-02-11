@@ -101,6 +101,12 @@ export const reportsAPI = {
   getEmailStatus: () => api.get('/reports/email-status'),
 };
 
+// Settings API
+export const settingsAPI = {
+  get: (category: string) => api.get(`/settings/${category}`),
+  save: (category: string, data: any) => api.put(`/settings/${category}`, data),
+};
+
 // Sync API
 export const syncAPI = {
   push: (data: any[]) => api.post('/sync/push', { transactions: data }),

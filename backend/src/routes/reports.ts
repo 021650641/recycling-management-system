@@ -662,7 +662,7 @@ router.post('/email', authorize('admin', 'manager'), async (req: any, res, next)
 
 // ─── Email config status ───
 router.get('/email-status', authorize('admin', 'manager'), async (_req, res) => {
-  res.json({ configured: isEmailConfigured() });
+  res.json({ configured: await isEmailConfigured() });
 });
 
 export default router;
