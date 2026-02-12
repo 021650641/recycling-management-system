@@ -22,3 +22,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_vehicle_reg ON delivery_vehicle (
 ALTER TABLE sale ADD COLUMN IF NOT EXISTS delivery_person_id UUID REFERENCES delivery_person(id);
 ALTER TABLE sale ADD COLUMN IF NOT EXISTS delivery_vehicle_id UUID REFERENCES delivery_vehicle(id);
 ALTER TABLE sale ADD COLUMN IF NOT EXISTS delivery_notes TEXT;
+
+-- Grant permissions to app user (needed when migration is run by postgres superuser)
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'recycling_user') THEN
+        GRANT ALL PRIVILEGES ON TABLE delivery_person TO recycling_user;
+        GRANT ALL PRIVILEGES ON TABLE delivery_vehicle TO recycling_user;
+    END IF;
+END
+$$;

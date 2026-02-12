@@ -74,4 +74,11 @@ for migration in "$SCRIPT_DIR"/[0-9]*.sql; do
     echo "[migrations] Applied $filename"
 done
 
+# When running as postgres superuser, ensure the app user has access to all tables
+if [ -z "$DB_PASSWORD" ] && [ "$APPLIED" -gt 0 ]; then
+    echo "[migrations] Granting table permissions to $DB_USER ..."
+    $PSQL_CMD -q -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $DB_USER;"
+    $PSQL_CMD -q -c "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $DB_USER;"
+fi
+
 echo "[migrations] Done. Applied: $APPLIED, Skipped (already applied): $SKIPPED"
