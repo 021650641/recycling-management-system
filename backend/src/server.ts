@@ -98,7 +98,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 const routeModules = [
   'auth', 'transactions', 'inventory', 'reports', 'locations',
   'materials', 'waste-pickers', 'apartments', 'clients', 'sales',
-  'sync', 'users', 'settings', 'logs', 'schedules',
+  'sync', 'users', 'settings', 'logs', 'schedules', 'delivery',
 ];
 logger.info(`Registered ${routeModules.length} route modules under ${config.apiPrefix}`);
 
