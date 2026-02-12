@@ -3,6 +3,8 @@ Description=Recycling Management System - Backend API
 Documentation=https://github.com/021650641/recycling-management-system
 After=network.target postgresql.service
 Requires=postgresql.service
+StartLimitBurst=10
+StartLimitIntervalSec=120
 
 [Service]
 Type=simple
@@ -13,8 +15,6 @@ ExecStartPre=+/bin/sh -c 'fuser -k 5000/tcp 2>/dev/null; sleep 2; exit 0'
 ExecStart=/usr/bin/node dist/server.js
 Restart=on-failure
 RestartSec=5
-StartLimitBurst=10
-StartLimitIntervalSec=120
 
 # Environment
 Environment=NODE_ENV=production
