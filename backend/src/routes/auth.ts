@@ -72,7 +72,7 @@ router.post('/login', async (req, res, next): Promise<any> => {
 router.get('/me', authenticate, async (req: any, res, next): Promise<any> => {
   try {
     const result = await query(
-      'SELECT id, email, first_name, last_name, role, location_id, is_active FROM "user" WHERE id = $1',
+      'SELECT id, email, first_name, last_name, role, location_id, is_active, last_login, created_at FROM "user" WHERE id = $1',
       [req.user.id]
     );
 
@@ -90,6 +90,53 @@ router.get('/me', authenticate, async (req: any, res, next): Promise<any> => {
       role: user.role,
       locationId: user.location_id,
       isActive: user.is_active,
+      lastLogin: user.last_login,
+      createdAt: user.created_at,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Update own profile
+router.put('/profile', authenticate, async (req: any, res, next): Promise<any> => {
+  try {
+    const { firstName, lastName, email } = req.body;
+
+    if (!firstName || !lastName || !email) {
+      return res.status(400).json({ error: 'First name, last name, and email are required' });
+    }
+
+    // Check email uniqueness (excluding self)
+    const emailCheck = await query(
+      'SELECT id FROM "user" WHERE email = $1 AND id != $2',
+      [email, req.user.id]
+    );
+    if (emailCheck.rows.length > 0) {
+      return res.status(409).json({ error: 'Email is already in use' });
+    }
+
+    await query(
+      'UPDATE "user" SET first_name = $1, last_name = $2, email = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
+      [firstName, lastName, email, req.user.id]
+    );
+
+    const result = await query(
+      'SELECT id, email, first_name, last_name, role, location_id, is_active, last_login, created_at FROM "user" WHERE id = $1',
+      [req.user.id]
+    );
+
+    const user = result.rows[0];
+    res.json({
+      id: user.id,
+      email: user.email,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      role: user.role,
+      locationId: user.location_id,
+      isActive: user.is_active,
+      lastLogin: user.last_login,
+      createdAt: user.created_at,
     });
   } catch (error) {
     next(error);

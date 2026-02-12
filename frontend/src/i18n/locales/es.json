@@ -78,7 +78,10 @@
     "confirmPassword": "Confirmar Contrasena",
     "passwordMismatch": "Las contrasenas no coinciden",
     "passwordTooShort": "La contrasena debe tener al menos 6 caracteres",
-    "passwordChanged": "Contrasena cambiada exitosamente"
+    "passwordChanged": "Contrasena cambiada exitosamente",
+    "editProfile": "Editar Perfil",
+    "lastLogin": "Ultimo Acceso",
+    "memberSince": "Miembro Desde"
   },
   "nav": {
     "dashboard": "Panel",

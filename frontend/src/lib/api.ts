@@ -42,6 +42,8 @@ export const authAPI = {
   getCurrentUser: () => api.get('/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.put('/auth/change-password', { currentPassword, newPassword }),
+  updateProfile: (data: { firstName: string; lastName: string; email: string }) =>
+    api.put('/auth/profile', data),
 };
 
 // Transactions API

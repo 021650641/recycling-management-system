@@ -78,7 +78,10 @@
     "confirmPassword": "Confirm Password",
     "passwordMismatch": "Passwords do not match",
     "passwordTooShort": "Password must be at least 6 characters",
-    "passwordChanged": "Password changed successfully"
+    "passwordChanged": "Password changed successfully",
+    "editProfile": "Edit Profile",
+    "lastLogin": "Last Login",
+    "memberSince": "Member Since"
   },
   "nav": {
     "dashboard": "Dashboard",

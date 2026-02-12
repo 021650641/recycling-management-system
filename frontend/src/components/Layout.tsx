@@ -27,6 +27,7 @@ import {
   ChevronDown,
   User,
   Lock,
+  Pencil,
 } from 'lucide-react';
 import packageJson from '../../package.json';
 
@@ -459,48 +460,178 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 // ===== Profile Modal =====
 function ProfileModal({ user, onClose }: { user: any; onClose: () => void }) {
   const { t } = useTranslation();
+  const { setUser } = useAuthStore();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [profile, setProfile] = useState<any>(null);
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '' });
 
-  const fields = [
-    { label: t('common.name'), value: user ? `${user.firstName} ${user.lastName}` : '-' },
-    { label: t('common.email'), value: user?.email || '-' },
-    { label: t('users.role'), value: user?.role || '-' },
-  ];
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      const res = await authAPI.getCurrentUser();
+      setProfile(res.data);
+      setForm({ firstName: res.data.firstName, lastName: res.data.lastName, email: res.data.email });
+    } catch {
+      // Use local user data as fallback
+      if (user) {
+        setProfile(user);
+        setForm({ firstName: user.firstName || '', lastName: user.lastName || '', email: user.email || '' });
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    if (!form.firstName || !form.lastName || !form.email) {
+      toast.error(t('common.required'));
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await authAPI.updateProfile(form);
+      setProfile(res.data);
+      setUser({ id: res.data.id, email: res.data.email, firstName: res.data.firstName, lastName: res.data.lastName, role: res.data.role, locationId: res.data.locationId });
+      toast.success(t('common.updated'));
+      setEditing(false);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || t('common.error'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setForm({ firstName: profile?.firstName || '', lastName: profile?.lastName || '', email: profile?.email || '' });
+    setEditing(false);
+  };
+
+  const p = profile || user;
+  const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString() : '-';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-900">{t('common.viewProfile')}</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            {editing ? t('common.editProfile') : t('common.viewProfile')}
+          </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-5 h-5" />
           </button>
         </div>
         <div className="p-6">
+          {/* Avatar header */}
           <div className="flex items-center gap-4 mb-6">
             <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
               <User className="w-8 h-8 text-primary-600" />
             </div>
             <div>
-              <p className="text-lg font-semibold text-gray-900">{user?.firstName} {user?.lastName}</p>
-              <p className="text-sm text-gray-500 capitalize">{user?.role}</p>
+              <p className="text-lg font-semibold text-gray-900">{p?.firstName} {p?.lastName}</p>
+              <p className="text-sm text-gray-500 capitalize">{p?.role}</p>
             </div>
           </div>
-          <div className="space-y-3">
-            {fields.map((f, i) => (
-              <div key={i} className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">{f.label}</span>
-                <span className="text-sm font-medium text-gray-900 capitalize">{f.value}</span>
+
+          {editing ? (
+            /* Edit mode */
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('vendors.firstName')}</label>
+                <input
+                  type="text"
+                  value={form.firstName}
+                  onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                />
               </div>
-            ))}
-          </div>
-          <div className="flex justify-end pt-4">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
-            >
-              {t('common.close')}
-            </button>
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('vendors.lastName')}</label>
+                <input
+                  type="text"
+                  value={form.lastName}
+                  onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('common.email')}</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                />
+              </div>
+              {/* Read-only fields */}
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">{t('users.role')}</span>
+                <span className="text-sm font-medium text-gray-900 capitalize">{p?.role || '-'}</span>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-4 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50"
+                >
+                  {saving ? t('common.loading') : t('common.save')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* View mode */
+            <div>
+              <div className="space-y-3">
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">{t('vendors.firstName')}</span>
+                  <span className="text-sm font-medium text-gray-900">{p?.firstName || '-'}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">{t('vendors.lastName')}</span>
+                  <span className="text-sm font-medium text-gray-900">{p?.lastName || '-'}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">{t('common.email')}</span>
+                  <span className="text-sm font-medium text-gray-900">{p?.email || '-'}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">{t('users.role')}</span>
+                  <span className="text-sm font-medium text-gray-900 capitalize">{p?.role || '-'}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">{t('common.lastLogin')}</span>
+                  <span className="text-sm font-medium text-gray-900">{formatDate(p?.lastLogin)}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">{t('common.memberSince')}</span>
+                  <span className="text-sm font-medium text-gray-900">{formatDate(p?.createdAt)}</span>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
+                >
+                  {t('common.close')}
+                </button>
+                <button
+                  onClick={() => setEditing(true)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg"
+                >
+                  <Pencil className="w-4 h-4" />
+                  {t('common.edit')}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
