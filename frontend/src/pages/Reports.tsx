@@ -523,7 +523,6 @@ function TraceabilityTab({ dateRange, refreshKey, t, dfmt }: any) {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('transactions.material')}</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">kg</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.total')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -533,7 +532,6 @@ function TraceabilityTab({ dateRange, refreshKey, t, dfmt }: any) {
                     <td className="px-4 py-3 text-sm">{row.material_category}</td>
                     <td className="px-4 py-3 text-sm">{parseFloat(row.total_weight_kg).toFixed(1)}</td>
                     <td className="px-4 py-3 text-sm">{row.transaction_count}</td>
-                    <td className="px-4 py-3 text-sm font-semibold">${parseFloat(row.total_cost).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -553,13 +551,11 @@ function TraceabilityTab({ dateRange, refreshKey, t, dfmt }: any) {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('transactions.wastePicker')}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('transactions.material')}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">kg</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.total')}</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.status')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {(data.transactions || []).length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">{t('common.noData')}</td></tr>
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">{t('common.noData')}</td></tr>
               ) : (data.transactions || []).map((row: any, i: number) => (
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm">{formatDate(row.transaction_date, dfmt)}</td>
@@ -567,8 +563,6 @@ function TraceabilityTab({ dateRange, refreshKey, t, dfmt }: any) {
                   <td className="px-4 py-3 text-sm">{row.waste_picker_name || '-'}</td>
                   <td className="px-4 py-3 text-sm">{row.material_category}</td>
                   <td className="px-4 py-3 text-sm">{parseFloat(row.weight_kg).toFixed(1)}</td>
-                  <td className="px-4 py-3 text-sm font-semibold">${parseFloat(row.total_cost).toFixed(2)}</td>
-                  <td className="px-4 py-3"><StatusBadge status={row.payment_status} /></td>
                 </tr>
               ))}
             </tbody>

@@ -5,8 +5,10 @@ import compression from 'compression';
 import morgan from 'morgan';
 import { config } from './config';
 import { healthCheck } from './db';
+import logger from './services/logger';
+import { startScheduler, stopScheduler } from './services/scheduler';
 
-// Import routes (will be created)
+// Import routes
 import authRoutes from './routes/auth';
 import transactionRoutes from './routes/transactions';
 import inventoryRoutes from './routes/inventory';
@@ -20,6 +22,8 @@ import salesRoutes from './routes/sales';
 import syncRoutes from './routes/sync';
 import userRoutes from './routes/users';
 import settingsRoutes from './routes/settings';
+import logRoutes from './routes/logs';
+import scheduleRoutes from './routes/schedules';
 
 const app = express();
 
@@ -59,6 +63,8 @@ apiRouter.use('/sales', salesRoutes);
 apiRouter.use('/sync', syncRoutes);
 apiRouter.use('/users', userRoutes);
 apiRouter.use('/settings', settingsRoutes);
+apiRouter.use('/logs', logRoutes);
+apiRouter.use('/schedules', scheduleRoutes);
 
 app.use(config.apiPrefix, apiRouter);
 
@@ -72,7 +78,7 @@ app.use((req: Request, res: Response) => {
 
 // Error handler
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Error:', err);
+  logger.error(`${err.message}`, { stack: err.stack, status: err.statusCode || err.status || 500 });
   
   const statusCode = err.statusCode || err.status || 500;
   const message = err.message || 'Internal Server Error';
@@ -90,9 +96,9 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 const routeModules = [
   'auth', 'transactions', 'inventory', 'reports', 'locations',
   'materials', 'waste-pickers', 'apartments', 'clients', 'sales',
-  'sync', 'users', 'settings',
+  'sync', 'users', 'settings', 'logs', 'schedules',
 ];
-console.log(`Registered ${routeModules.length} route modules under ${config.apiPrefix}`);
+logger.info(`Registered ${routeModules.length} route modules under ${config.apiPrefix}`);
 
 // Start server with EADDRINUSE retry logic
 const MAX_RETRIES = 3;
@@ -101,9 +107,11 @@ let retryCount = 0;
 
 function startServer(): void {
   const server_instance = app.listen(config.port, () => {
-    console.log(`Server running on port ${config.port}`);
-    console.log(`API available at http://localhost:${config.port}${config.apiPrefix}`);
-    console.log(`Environment: ${config.nodeEnv}`);
+    logger.info(`Server running on port ${config.port}`);
+    logger.info(`API available at http://localhost:${config.port}${config.apiPrefix}`);
+    logger.info(`Environment: ${config.nodeEnv}`);
+    // Start report scheduler after server is up
+    startScheduler().catch(err => logger.error(`Scheduler init error: ${err.message}`));
   });
 
   server_instance.on('error', (err: NodeJS.ErrnoException) => {
@@ -126,7 +134,8 @@ startServer();
 
 // Graceful shutdown
 const gracefulShutdown = (signal: string) => {
-  console.log(`\n${signal} received, shutting down gracefully...`);
+  logger.info(`${signal} received, shutting down gracefully...`);
+  stopScheduler();
   if (currentServer) {
     currentServer.close(() => {
       console.log('Server closed');

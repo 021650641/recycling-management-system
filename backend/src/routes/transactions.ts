@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { query } from '../db';
 import { authenticate, authorize } from '../middleware/auth';
+import logger from '../services/logger';
+import { sendPurchaseConfirmation } from '../services/confirmationService';
 
 const router = Router();
 
@@ -69,6 +71,11 @@ router.post('/', authorize('admin', 'manager', 'operator'), async (req: any, res
         paymentMethod || 'cash', notes || null, req.user.id, deviceId || null
       ]
     );
+
+    logger.info(`Transaction created: ${transactionNumber}`, { userId: req.user.id, weight: weightKg, material: materialCategoryId });
+
+    // Send confirmation email (async, don't block response)
+    sendPurchaseConfirmation(result.rows[0].id).catch(() => {});
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -205,6 +212,11 @@ router.patch('/:id/notes', authorize('admin', 'manager', 'operator'), async (req
 // Void/reverse a transaction (purchase)
 router.post('/:id/void', authorize('admin', 'manager'), async (req: any, res, next) => {
   try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'Reason is required when voiding a transaction' });
+    }
+
     const original = await query('SELECT * FROM transaction WHERE id = $1', [req.params.id]);
     if (original.rows.length === 0) {
       return res.status(404).json({ error: 'Transaction not found' });
@@ -239,11 +251,12 @@ router.post('/:id/void', authorize('admin', 'manager'), async (req: any, res, ne
         tx.apartment_complex_id, tx.apartment_unit_id, tx.waste_picker_id,
         -Math.abs(tx.weight_kg), tx.quality_grade, tx.unit_price, -Math.abs(tx.total_cost),
         'paid', tx.payment_method, -Math.abs(tx.paid_amount || 0),
-        `Reversal of ${tx.transaction_number}. ${req.body.reason || ''}`.trim(),
+        `Reversal of ${tx.transaction_number}. ${reason.trim()}`,
         req.user.id
       ]
     );
 
+    logger.warn(`Transaction voided: ${tx.transaction_number} -> ${reversalNumber}`, { userId: req.user.id, reason: reason.trim() });
     return res.status(201).json(result.rows[0]);
   } catch (error) {
     next(error);

@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { materialsAPI, locationsAPI, settingsAPI, pricesAPI, usersAPI } from '@/lib/api';
+import { materialsAPI, locationsAPI, settingsAPI, pricesAPI, usersAPI, logsAPI, schedulesAPI } from '@/lib/api';
 import { api } from '@/lib/api';
-import { Plus, Edit2, Trash2, Save, X, Mail, Settings, Clock, Calendar, Users } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Mail, Settings, Clock, Calendar, Users, FileText, CalendarClock, Bell, Download, Pause, Play, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
 import { useSettingsStore, type DateFormat, type TimeFormat } from '@/store/settingsStore';
 import { formatDate } from '@/lib/dateFormat';
 
-type TabType = 'materials' | 'locations' | 'pricing' | 'users' | 'email' | 'display';
+type TabType = 'materials' | 'locations' | 'pricing' | 'users' | 'email' | 'display' | 'logs' | 'scheduling' | 'confirmations';
 
 export default function AdminPanel() {
   const { t } = useTranslation();
@@ -292,6 +292,45 @@ export default function AdminPanel() {
             <Settings className="w-4 h-4" />
             {t('admin.displaySettings')}
           </button>
+          {currentUser?.role === 'admin' && (
+            <button
+              onClick={() => setActiveTab('logs')}
+              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-1.5 ${
+                activeTab === 'logs'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              {t('admin.logs')}
+            </button>
+          )}
+          {currentUser?.role === 'admin' && (
+            <button
+              onClick={() => setActiveTab('scheduling')}
+              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-1.5 ${
+                activeTab === 'scheduling'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <CalendarClock className="w-4 h-4" />
+              {t('admin.scheduling')}
+            </button>
+          )}
+          {currentUser?.role === 'admin' && (
+            <button
+              onClick={() => setActiveTab('confirmations')}
+              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-1.5 ${
+                activeTab === 'confirmations'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Bell className="w-4 h-4" />
+              {t('admin.confirmations')}
+            </button>
+          )}
         </nav>
       </div>
 
@@ -306,6 +345,9 @@ export default function AdminPanel() {
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'email' && <EmailSettingsTab />}
           {activeTab === 'display' && <DisplaySettingsTab />}
+          {activeTab === 'logs' && <LogsTab />}
+          {activeTab === 'scheduling' && <SchedulingTab />}
+          {activeTab === 'confirmations' && <ConfirmationsTab />}
         </>
       )}
     </div>
@@ -1560,6 +1602,641 @@ function DisplaySettingsTab() {
 
         <div className="pt-4 border-t border-gray-200">
           <p className="text-xs text-gray-500">{t('admin.settingsAutoSave')}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Logs Tab =====
+function LogsTab() {
+  const { t } = useTranslation();
+  const [level, setLevel] = useState<'info' | 'error' | 'debug'>('info');
+  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [search, setSearch] = useState('');
+  const [entries, setEntries] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [files, setFiles] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadFiles();
+  }, []);
+
+  useEffect(() => {
+    loadEntries();
+  }, [level, date]);
+
+  const loadFiles = async () => {
+    try {
+      const res = await logsAPI.getFiles();
+      const data = Array.isArray(res.data) ? res.data : res.data?.files || [];
+      setFiles(data);
+    } catch {
+      // ignore
+    }
+  };
+
+  const loadEntries = async () => {
+    setLoading(true);
+    try {
+      const res = await logsAPI.getEntries({ level, date, search: search || undefined, limit: 200 });
+      const data = res.data;
+      const entryList = Array.isArray(data) ? data : data?.entries || [];
+      setEntries(entryList);
+      setTotal(data?.total ?? entryList.length);
+    } catch (error) {
+      console.error('Failed to load log entries:', error);
+      toast.error(t('common.failedToLoad'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = () => {
+    loadEntries();
+  };
+
+  const handleDownload = async (filename: string) => {
+    try {
+      const res = await logsAPI.download(filename);
+      const blob = new Blob([res.data], { type: 'application/octet-stream' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Failed to download log file:', error);
+      toast.error('Failed to download log file');
+    }
+  };
+
+  const formatEntry = (entry: any): string => {
+    if (typeof entry === 'string') return entry;
+    const ts = entry.timestamp || entry.date || '';
+    const lvl = (entry.level || '').toUpperCase();
+    const msg = entry.message || JSON.stringify(entry);
+    return `[${ts}] ${lvl}: ${msg}`;
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold text-gray-900">{t('admin.logs')}</h2>
+        <button
+          onClick={loadEntries}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-800 px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm"
+        >
+          <RefreshCw className="w-4 h-4" />
+          {t('common.refresh') || 'Refresh'}
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white p-4 rounded-lg shadow flex flex-wrap items-end gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Level</label>
+          <select
+            value={level}
+            onChange={(e) => setLevel(e.target.value as 'info' | 'error' | 'debug')}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+          >
+            <option value="info">Info</option>
+            <option value="error">Error</option>
+            <option value="debug">Debug</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{t('common.date')}</label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+          />
+        </div>
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-sm font-medium text-gray-700 mb-1">{t('common.search') || 'Search'}</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              placeholder="Filter log entries..."
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+            />
+            <button
+              onClick={handleSearch}
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded-lg"
+            >
+              {t('common.search') || 'Search'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Log entries */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+          <span className="text-sm text-gray-500">
+            {total} {total === 1 ? 'entry' : 'entries'}
+          </span>
+        </div>
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>
+        ) : entries.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">{t('common.noResults')}</div>
+        ) : (
+          <pre className="p-4 text-xs font-mono text-gray-800 bg-gray-50 overflow-auto max-h-[500px] whitespace-pre-wrap break-words">
+            {entries.map((entry) => formatEntry(entry)).join('\n')}
+          </pre>
+        )}
+      </div>
+
+      {/* Log files for download */}
+      {files.length > 0 && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200">
+            <h3 className="text-sm font-medium text-gray-700">Log Files</h3>
+          </div>
+          <ul className="divide-y divide-gray-100">
+            {files.map((file: any) => {
+              const filename = typeof file === 'string' ? file : file.name || file.filename || '';
+              return (
+                <li key={filename} className="px-4 py-3 flex items-center justify-between hover:bg-gray-50">
+                  <span className="text-sm text-gray-800 font-mono">{filename}</span>
+                  <button
+                    onClick={() => handleDownload(filename)}
+                    className="flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-800"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== Scheduling Tab =====
+function SchedulingTab() {
+  const { t } = useTranslation();
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    reportType: 'purchases',
+    format: 'pdf',
+    frequency: 'daily',
+    recipients: '',
+  });
+
+  useEffect(() => {
+    loadSchedules();
+  }, []);
+
+  const loadSchedules = async () => {
+    setLoading(true);
+    try {
+      const res = await schedulesAPI.getAll();
+      const data = Array.isArray(res.data) ? res.data : res.data?.schedules || [];
+      setSchedules(data);
+    } catch (error) {
+      console.error('Failed to load schedules:', error);
+      toast.error(t('common.failedToLoad'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggle = async (id: string) => {
+    try {
+      await schedulesAPI.toggle(id);
+      setSchedules(prev =>
+        prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s)
+      );
+      toast.success('Schedule updated');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to toggle schedule');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm(t('common.confirmDelete'))) return;
+    try {
+      await schedulesAPI.delete(id);
+      setSchedules(prev => prev.filter(s => s.id !== id));
+      toast.success('Schedule deleted');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || t('common.failedToDelete'));
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({ reportType: 'purchases', format: 'pdf', frequency: 'daily', recipients: '' });
+    setEditingSchedule(null);
+    setShowForm(false);
+  };
+
+  const handleEdit = (schedule: any) => {
+    setEditingSchedule(schedule);
+    setFormData({
+      reportType: schedule.report_type || schedule.reportType || 'purchases',
+      format: schedule.format || 'pdf',
+      frequency: schedule.frequency || 'daily',
+      recipients: Array.isArray(schedule.recipients) ? schedule.recipients.join(', ') : (schedule.recipients || ''),
+    });
+    setShowForm(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload = {
+      reportType: formData.reportType,
+      format: formData.format,
+      frequency: formData.frequency,
+      recipients: formData.recipients.split(',').map((r: string) => r.trim()).filter(Boolean),
+    };
+    try {
+      if (editingSchedule) {
+        await schedulesAPI.update(editingSchedule.id, payload);
+        toast.success('Schedule updated');
+      } else {
+        await schedulesAPI.create(payload);
+        toast.success('Schedule created');
+      }
+      resetForm();
+      loadSchedules();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || t('common.failedToSave'));
+    }
+  };
+
+  const formatFrequency = (freq: string) => {
+    switch (freq) {
+      case 'daily': return 'Daily';
+      case 'weekly': return 'Weekly';
+      case 'monthly': return 'Monthly';
+      default: return freq;
+    }
+  };
+
+  const formatReportType = (type: string) => {
+    switch (type) {
+      case 'purchases': return 'Purchases';
+      case 'sales': return 'Sales';
+      case 'inventory': return 'Inventory';
+      case 'traceability': return 'Traceability';
+      default: return type;
+    }
+  };
+
+  if (loading) return <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold text-gray-900">{t('admin.scheduling')}</h2>
+        <button
+          onClick={() => { resetForm(); setShowForm(true); }}
+          className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
+        >
+          <Plus className="w-4 h-4" />
+          New Schedule
+        </button>
+      </div>
+
+      {/* Inline form */}
+      {showForm && (
+        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
+          <h3 className="text-lg font-medium text-gray-900">
+            {editingSchedule ? 'Edit Schedule' : 'New Schedule'}
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Report Type *</label>
+              <select
+                value={formData.reportType}
+                onChange={(e) => setFormData({ ...formData, reportType: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                required
+              >
+                <option value="purchases">Purchases</option>
+                <option value="sales">Sales</option>
+                <option value="inventory">Inventory</option>
+                <option value="traceability">Traceability</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Format *</label>
+              <select
+                value={formData.format}
+                onChange={(e) => setFormData({ ...formData, format: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                required
+              >
+                <option value="pdf">PDF</option>
+                <option value="csv">CSV</option>
+                <option value="excel">Excel</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Frequency *</label>
+              <select
+                value={formData.frequency}
+                onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                required
+              >
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Recipients *</label>
+              <input
+                type="text"
+                value={formData.recipients}
+                onChange={(e) => setFormData({ ...formData, recipients: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                placeholder="email1@example.com, email2@example.com"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">Comma-separated email addresses</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
+              <Save className="w-4 h-4" />
+              {t('common.save')}
+            </button>
+            <button type="button" onClick={resetForm} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
+              <X className="w-4 h-4" />
+              {t('common.cancel')}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Schedules table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Report Type</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Format</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Frequency</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recipients</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.status')}</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Run</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {schedules.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  {t('common.noResults')}
+                </td>
+              </tr>
+            ) : (
+              schedules.map((schedule) => {
+                const recipients = Array.isArray(schedule.recipients)
+                  ? schedule.recipients.join(', ')
+                  : (schedule.recipients || '-');
+                const lastRun = schedule.last_run || schedule.lastRun;
+                return (
+                  <tr key={schedule.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      {formatReportType(schedule.report_type || schedule.reportType || '')}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 uppercase">
+                      {schedule.format || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      {formatFrequency(schedule.frequency || '')}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 max-w-[200px] truncate" title={recipients}>
+                      {recipients}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleToggle(schedule.id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                          schedule.enabled
+                            ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {schedule.enabled ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                        {schedule.enabled ? t('common.active') : t('common.inactive')}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {lastRun ? new Date(lastRun).toLocaleString() : '-'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <button onClick={() => handleEdit(schedule)} className="text-blue-600 hover:text-blue-800">
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDelete(schedule.id)} className="text-red-600 hover:text-red-800">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ===== Confirmations Tab =====
+function ConfirmationsTab() {
+  const { t } = useTranslation();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [settings, setSettings] = useState({
+    purchaseEmailEnabled: false,
+    saleEmailEnabled: false,
+    purchaseRecipientField: 'vendor' as 'vendor' | 'custom',
+    saleRecipientField: 'client' as 'client' | 'custom',
+    customPurchaseEmail: '',
+    customSaleEmail: '',
+  });
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    setLoading(true);
+    try {
+      const res = await settingsAPI.get('confirmations');
+      const data = res.data;
+      if (data && Object.keys(data).length > 0) {
+        setSettings({
+          purchaseEmailEnabled: data.purchaseEmailEnabled ?? false,
+          saleEmailEnabled: data.saleEmailEnabled ?? false,
+          purchaseRecipientField: data.purchaseRecipientField || 'vendor',
+          saleRecipientField: data.saleRecipientField || 'client',
+          customPurchaseEmail: data.customPurchaseEmail || '',
+          customSaleEmail: data.customSaleEmail || '',
+        });
+      }
+    } catch {
+      // settings may not exist yet, that's fine
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await settingsAPI.save('confirmations', settings);
+      toast.success(t('admin.settingsSaved') || 'Settings saved');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || t('common.failedToSave'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900">{t('admin.confirmations')}</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Configure email confirmations sent after purchases and sales.
+        </p>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow space-y-6">
+        {/* Purchase confirmations */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Purchase Confirmations</h3>
+              <p className="text-sm text-gray-500">Send email confirmations for purchase transactions</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.purchaseEmailEnabled}
+                onChange={(e) => setSettings({ ...settings, purchaseEmailEnabled: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+            </label>
+          </div>
+
+          {settings.purchaseEmailEnabled && (
+            <div className="ml-4 pl-4 border-l-2 border-gray-200 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Recipient</label>
+                <select
+                  value={settings.purchaseRecipientField}
+                  onChange={(e) => setSettings({ ...settings, purchaseRecipientField: e.target.value as 'vendor' | 'custom' })}
+                  className="w-full max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                >
+                  <option value="vendor">Vendor email (from waste picker record)</option>
+                  <option value="custom">Custom email address</option>
+                </select>
+              </div>
+              {settings.purchaseRecipientField === 'custom' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Custom Email</label>
+                  <input
+                    type="email"
+                    value={settings.customPurchaseEmail}
+                    onChange={(e) => setSettings({ ...settings, customPurchaseEmail: e.target.value })}
+                    className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                    placeholder="receipts@example.com"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <hr className="border-gray-200" />
+
+        {/* Sale confirmations */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Sale Confirmations</h3>
+              <p className="text-sm text-gray-500">Send email confirmations for sale transactions</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.saleEmailEnabled}
+                onChange={(e) => setSettings({ ...settings, saleEmailEnabled: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+            </label>
+          </div>
+
+          {settings.saleEmailEnabled && (
+            <div className="ml-4 pl-4 border-l-2 border-gray-200 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Recipient</label>
+                <select
+                  value={settings.saleRecipientField}
+                  onChange={(e) => setSettings({ ...settings, saleRecipientField: e.target.value as 'client' | 'custom' })}
+                  className="w-full max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                >
+                  <option value="client">Client email (from client record)</option>
+                  <option value="custom">Custom email address</option>
+                </select>
+              </div>
+              {settings.saleRecipientField === 'custom' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Custom Email</label>
+                  <input
+                    type="email"
+                    value={settings.customSaleEmail}
+                    onChange={(e) => setSettings({ ...settings, customSaleEmail: e.target.value })}
+                    className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                    placeholder="sales@example.com"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Save button */}
+        <div className="pt-4 border-t border-gray-200">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+          >
+            <Save className="w-4 h-4" />
+            {saving ? t('common.loading') : t('common.save')}
+          </button>
         </div>
       </div>
     </div>

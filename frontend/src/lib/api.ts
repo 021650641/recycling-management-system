@@ -169,3 +169,19 @@ export const usersAPI = {
   delete: (id: number) => api.delete(`/users/${id}`),
   changePassword: (id: number, data: any) => api.put(`/users/${id}/password`, data),
 };
+
+// Logs API (admin only)
+export const logsAPI = {
+  getFiles: () => api.get('/logs/files'),
+  getEntries: (params?: any) => api.get('/logs/entries', { params }),
+  download: (filename: string) => api.get(`/logs/download/${filename}`, { responseType: 'blob' }),
+};
+
+// Schedules API
+export const schedulesAPI = {
+  getAll: () => api.get('/schedules'),
+  create: (data: any) => api.post('/schedules', data),
+  update: (id: string, data: any) => api.put(`/schedules/${id}`, data),
+  delete: (id: string) => api.delete(`/schedules/${id}`),
+  toggle: (id: string) => api.patch(`/schedules/${id}/toggle`),
+};

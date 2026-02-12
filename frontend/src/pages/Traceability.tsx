@@ -286,11 +286,7 @@ export default function Traceability() {
                     <p className="text-gray-500">{t('traceability.transactionCount')}</p>
                     <p className="font-medium">{s.transaction_count}</p>
                   </div>
-                  <div>
-                    <p className="text-gray-500">{t('traceability.totalCost')}</p>
-                    <p className="font-medium">${Number(s.total_cost || 0).toFixed(2)}</p>
-                  </div>
-                  <div>
+                  <div className="col-span-2">
                     <p className="text-gray-500">{t('traceability.period')}</p>
                     <p className="font-medium text-xs">
                       {formatDate(s.first_transaction, dfmt)}
@@ -324,8 +320,6 @@ export default function Traceability() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('traceability.unitResident')}</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.material')}</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('reports.weightKg')}</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('reports.cost')}</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">{t('sales.payment')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -365,18 +359,6 @@ export default function Traceability() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right">
                         {Number(tx.weight_kg).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                        ${Number(tx.total_cost || 0).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          tx.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
-                          tx.payment_status === 'partial' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {tx.payment_status || 'pending'}
-                        </span>
                       </td>
                     </tr>
                   ))}

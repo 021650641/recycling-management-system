@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { query } from '../db';
 import { authenticate, authorize } from '../middleware/auth';
+import logger from '../services/logger';
+import { sendSaleConfirmation } from '../services/confirmationService';
 
 const router = Router();
 router.use(authenticate);
@@ -113,6 +115,11 @@ router.post('/', authorize('admin', 'manager', 'operator'), async (req: any, res
       ]
     );
 
+    logger.info(`Sale created: ${saleNumber}`, { userId: req.user.id, client: clientId, weight: weightKg });
+
+    // Send confirmation email (async, don't block response)
+    sendSaleConfirmation(result.rows[0].id).catch(() => {});
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     next(error);
@@ -184,6 +191,11 @@ router.patch('/:id/notes', authorize('admin', 'manager', 'operator'), async (req
 // Void/reverse a sale
 router.post('/:id/void', authorize('admin', 'manager'), async (req: any, res, next): Promise<any> => {
   try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'Reason is required when voiding a sale' });
+    }
+
     // Get the original sale
     const original = await query('SELECT * FROM sale WHERE id = $1', [req.params.id]);
     if (original.rows.length === 0) {
@@ -220,11 +232,12 @@ router.post('/:id/void', authorize('admin', 'manager'), async (req: any, res, ne
         reversalNumber, sale.client_id, sale.location_id, sale.material_category_id,
         -Math.abs(sale.weight_kg), sale.unit_price, -Math.abs(sale.total_amount),
         'paid', sale.payment_method, -Math.abs(sale.paid_amount || 0),
-        sale.delivery_status, `Reversal of ${sale.sale_number}. ${req.body.reason || ''}`.trim(),
+        sale.delivery_status, `Reversal of ${sale.sale_number}. ${reason.trim()}`,
         req.user.id
       ]
     );
 
+    logger.warn(`Sale voided: ${sale.sale_number} -> ${reversalNumber}`, { userId: req.user.id, reason: reason.trim() });
     res.status(201).json(result.rows[0]);
   } catch (error) {
     next(error);
