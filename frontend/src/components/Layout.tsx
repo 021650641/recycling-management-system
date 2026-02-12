@@ -19,7 +19,6 @@ import {
   UserCheck,
   Building2,
   Home,
-  ShoppingCart,
   GitBranch,
   Globe,
   HelpCircle,
@@ -96,7 +95,6 @@ export default function Layout() {
     { path: '/vendors', label: t('nav.vendors'), icon: UserCheck, roles: ['admin', 'manager', 'operator'] },
     { path: '/clients', label: t('nav.clients'), icon: Building2, roles: ['admin', 'manager', 'operator'] },
     { path: '/sources', label: t('nav.sources'), icon: Home, roles: ['admin', 'manager', 'operator'] },
-    { path: '/sales', label: t('nav.sales'), icon: ShoppingCart, roles: ['admin', 'manager', 'operator'] },
     { path: '/traceability', label: t('nav.traceability'), icon: GitBranch, roles: ['admin', 'manager'] },
   ];
 

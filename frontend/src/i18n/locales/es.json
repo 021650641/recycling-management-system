@@ -120,6 +120,9 @@
   },
   "transactions": {
     "title": "Transacciones",
+    "purchasesTab": "Compras",
+    "salesTab": "Ventas",
+    "newPurchase": "Nueva Compra",
     "new": "Nueva Transaccion",
     "create": "Crear Transaccion",
     "location": "Ubicacion",
