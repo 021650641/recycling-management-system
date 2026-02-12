@@ -4,8 +4,9 @@ import { authAPI } from '@/lib/api';
 
 interface User {
   id: number;
-  username: string;
-  fullName: string;
+  email: string;
+  firstName: string;
+  lastName: string;
   role: 'admin' | 'manager' | 'operator' | 'viewer';
   locationId?: number;
 }

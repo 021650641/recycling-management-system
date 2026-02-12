@@ -159,32 +159,28 @@ export default function Dashboard() {
             {displayTransactions.length === 0 ? (
               <p className="text-gray-500 text-center py-4">{t('dashboard.noRecentTransactions')}</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {displayTransactions.map((transaction) => (
                   <div
                     key={transaction.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg text-sm"
                   >
-                    <div>
-                      <p className="font-medium text-gray-900">{transaction.materialName || t('transactions.material')}</p>
-                      <p className="text-sm text-gray-500">
-                        {transaction.transactionNumber || transaction.type} - {transaction.quantity} kg
-                      </p>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium text-gray-900 truncate">{transaction.materialName || '—'}</span>
+                      <span className="text-gray-400">·</span>
+                      <span className="text-gray-500 whitespace-nowrap">{transaction.quantity} kg</span>
+                      <span className="text-gray-400">·</span>
+                      <span className="font-semibold text-gray-900 whitespace-nowrap">${(transaction.totalAmount || 0).toFixed(2)}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-900">
-                        ${(transaction.totalAmount || 0).toFixed(2)}
-                      </p>
-                      <p
-                        className={`text-xs capitalize ${
-                          transaction.paymentStatus === 'paid'
-                            ? 'text-green-600'
-                            : 'text-yellow-600'
-                        }`}
-                      >
-                        {transaction.paymentStatus}
-                      </p>
-                    </div>
+                    <span
+                      className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium capitalize whitespace-nowrap ${
+                        transaction.paymentStatus === 'paid'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}
+                    >
+                      {transaction.paymentStatus}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -207,24 +203,20 @@ export default function Dashboard() {
             {!lowStockItems || lowStockItems.length === 0 ? (
               <p className="text-gray-500 text-center py-4">{t('dashboard.allStockGood')}</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {lowStockItems.map((material) => (
                   <div
                     key={material.id}
-                    className="flex items-center justify-between p-3 bg-red-50 rounded-lg"
+                    className="flex items-center justify-between p-2.5 bg-red-50 rounded-lg text-sm"
                   >
-                    <div>
-                      <p className="font-medium text-gray-900">{material.name}</p>
-                      <p className="text-sm text-gray-500 capitalize">{material.category}</p>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium text-gray-900 truncate">{material.name}</span>
+                      <span className="text-gray-400">·</span>
+                      <span className="text-gray-500 capitalize">{material.category}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-red-600">
-                        {material.currentStock} {material.unit}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Min: {material.minStockLevel || 0} {material.unit}
-                      </p>
-                    </div>
+                    <span className="ml-2 font-semibold text-red-600 whitespace-nowrap">
+                      {material.currentStock} {material.unit}
+                    </span>
                   </div>
                 ))}
               </div>

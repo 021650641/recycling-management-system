@@ -299,14 +299,14 @@ export default function Layout() {
                   className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <span className="hidden sm:inline text-gray-500">{t('common.welcome')},</span>
-                  <span className="font-medium">{user?.fullName || 'User'}</span>
+                  <span className="font-medium">{user?.firstName || 'User'}</span>
                   <ChevronDown className={`w-4 h-4 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
                 </button>
 
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                     <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
+                      <p className="text-sm font-medium text-gray-900">{user?.firstName} {user?.lastName}</p>
                       <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
                     </div>
                     <button
@@ -464,8 +464,8 @@ function ProfileModal({ user, onClose }: { user: any; onClose: () => void }) {
   const { t } = useTranslation();
 
   const fields = [
-    { label: t('common.name'), value: user?.fullName || '-' },
-    { label: t('common.email'), value: user?.email || user?.username || '-' },
+    { label: t('common.name'), value: user ? `${user.firstName} ${user.lastName}` : '-' },
+    { label: t('common.email'), value: user?.email || '-' },
     { label: t('users.role'), value: user?.role || '-' },
   ];
 
@@ -484,7 +484,7 @@ function ProfileModal({ user, onClose }: { user: any; onClose: () => void }) {
               <User className="w-8 h-8 text-primary-600" />
             </div>
             <div>
-              <p className="text-lg font-semibold text-gray-900">{user?.fullName}</p>
+              <p className="text-lg font-semibold text-gray-900">{user?.firstName} {user?.lastName}</p>
               <p className="text-sm text-gray-500 capitalize">{user?.role}</p>
             </div>
           </div>
