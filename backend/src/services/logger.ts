@@ -5,9 +5,15 @@ import fs from 'fs';
 
 const LOG_DIR = process.env.LOG_DIR || path.join(process.cwd(), 'logs');
 
-// Ensure log directory exists
-if (!fs.existsSync(LOG_DIR)) {
-  fs.mkdirSync(LOG_DIR, { recursive: true });
+// Try to create log directory - fall back to console-only if it fails
+let fileLoggingEnabled = true;
+try {
+  if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+  }
+} catch (err) {
+  console.warn(`[logger] Could not create log directory ${LOG_DIR}: ${err}. File logging disabled.`);
+  fileLoggingEnabled = false;
 }
 
 const logFormat = winston.format.combine(
@@ -18,59 +24,57 @@ const logFormat = winston.format.combine(
   })
 );
 
-// Info level: all operational events
-const infoTransport = new DailyRotateFile({
-  filename: path.join(LOG_DIR, 'info-%DATE%.log'),
-  datePattern: 'YYYY-MM-DD',
-  level: 'info',
-  maxFiles: '30d',
-  maxSize: '20m',
-  format: logFormat,
-});
+const transports: winston.transport[] = [];
 
-// Error/Warning level: errors and warnings only
-const errorTransport = new DailyRotateFile({
-  filename: path.join(LOG_DIR, 'error-%DATE%.log'),
-  datePattern: 'YYYY-MM-DD',
-  level: 'warn',
-  maxFiles: '90d',
-  maxSize: '20m',
-  format: logFormat,
-});
+if (fileLoggingEnabled) {
+  // Info level: all operational events
+  transports.push(new DailyRotateFile({
+    filename: path.join(LOG_DIR, 'info-%DATE%.log'),
+    datePattern: 'YYYY-MM-DD',
+    level: 'info',
+    maxFiles: '30d',
+    maxSize: '20m',
+    format: logFormat,
+  }));
 
-// Debug level: verbose debug information
-const debugTransport = new DailyRotateFile({
-  filename: path.join(LOG_DIR, 'debug-%DATE%.log'),
-  datePattern: 'YYYY-MM-DD',
-  level: 'debug',
-  maxFiles: '7d',
-  maxSize: '50m',
-  format: logFormat,
-});
+  // Error/Warning level: errors and warnings only
+  transports.push(new DailyRotateFile({
+    filename: path.join(LOG_DIR, 'error-%DATE%.log'),
+    datePattern: 'YYYY-MM-DD',
+    level: 'warn',
+    maxFiles: '90d',
+    maxSize: '20m',
+    format: logFormat,
+  }));
+
+  // Debug level: verbose debug information
+  transports.push(new DailyRotateFile({
+    filename: path.join(LOG_DIR, 'debug-%DATE%.log'),
+    datePattern: 'YYYY-MM-DD',
+    level: 'debug',
+    maxFiles: '7d',
+    maxSize: '50m',
+    format: logFormat,
+  }));
+}
+
+// Always add console transport (for systemd journal capture and fallback)
+transports.push(new winston.transports.Console({
+  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  format: winston.format.combine(
+    winston.format.colorize(),
+    winston.format.timestamp({ format: 'HH:mm:ss' }),
+    winston.format.printf(({ timestamp, level, message, ...meta }) => {
+      const metaStr = Object.keys(meta).length > 0 ? ' ' + JSON.stringify(meta) : '';
+      return `${timestamp} ${level} ${message}${metaStr}`;
+    })
+  ),
+}));
 
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
-  transports: [
-    infoTransport,
-    errorTransport,
-    debugTransport,
-  ],
+  transports,
 });
-
-// Also log to console in development
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    level: 'debug',
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.timestamp({ format: 'HH:mm:ss' }),
-      winston.format.printf(({ timestamp, level, message, ...meta }) => {
-        const metaStr = Object.keys(meta).length > 0 ? ' ' + JSON.stringify(meta) : '';
-        return `${timestamp} ${level} ${message}${metaStr}`;
-      })
-    ),
-  }));
-}
 
 // Helper: get available log files
 export function getLogFiles(): { name: string; date: string; level: string; size: number }[] {
