@@ -227,10 +227,7 @@ export default function Layout() {
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
-          <div className="text-center">
-            <p className="text-[10px] text-gray-400">v{packageJson.version}</p>
-            <p className="text-[10px] text-gray-400">&copy; {new Date().getFullYear()} Panacea</p>
-          </div>
+          <p className="text-[10px] text-gray-400 text-center">v{packageJson.version} &mdash; &copy; {new Date().getFullYear()} Panacea</p>
         </div>
       </aside>
 
