@@ -224,7 +224,9 @@
     "currentStock": "Current Stock",
     "salePricePerKg": "Sale Price/kg",
     "estimatedValue": "Estimated Value",
-    "status": "Status"
+    "status": "Status",
+    "inStock": "In Stock",
+    "noStock": "No Stock"
   },
   "reports": {
     "title": "Reports & Analytics",

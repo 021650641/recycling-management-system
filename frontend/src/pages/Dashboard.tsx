@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { reportsAPI, transactionsAPI } from '@/lib/api';
+import { reportsAPI, transactionsAPI, inventoryAPI } from '@/lib/api';
 import { Plus, TrendingUp, TrendingDown, Package, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [apiTransactions, setApiTransactions] = useState<any[] | null>(null);
+  const [inventoryItems, setInventoryItems] = useState<any[] | null>(null);
 
   // Get recent transactions from local DB (fallback for offline)
   const recentTransactions = useLiveQuery(
@@ -19,15 +20,10 @@ export default function Dashboard() {
     []
   );
 
-  // Get low stock items
-  const lowStockItems = useLiveQuery(
-    () => db.materials.where('currentStock').below(10).toArray(),
-    []
-  );
-
   useEffect(() => {
     loadSummary();
     loadRecentFromAPI();
+    loadInventoryFromAPI();
   }, []);
 
   const loadRecentFromAPI = async () => {
@@ -35,9 +31,9 @@ export default function Dashboard() {
       const response = await transactionsAPI.getAll({ limit: 5, offset: 0 });
       const txs = response.data?.transactions || response.data || [];
       setApiTransactions(txs.map((tx: any) => ({
-        id: tx.id,
+        id: tx.transaction_id || tx.id,
         type: 'purchase',
-        materialName: tx.material_name || tx.materialName,
+        materialName: tx.material_category || tx.material_name || tx.materialName,
         quantity: parseFloat(tx.weight_kg || tx.quantity || 0),
         totalAmount: parseFloat(tx.total_cost || tx.totalAmount || 0),
         paymentStatus: tx.payment_status || tx.paymentStatus || 'pending',
@@ -45,6 +41,16 @@ export default function Dashboard() {
       })));
     } catch {
       // Offline - will use local DB
+    }
+  };
+
+  const loadInventoryFromAPI = async () => {
+    try {
+      const response = await inventoryAPI.getAll();
+      const items = response.data?.inventory || response.data || [];
+      setInventoryItems(items);
+    } catch {
+      // Offline - no inventory data
     }
   };
 
@@ -72,6 +78,15 @@ export default function Dashboard() {
     paymentStatus: tx.paymentStatus,
     transactionNumber: tx.transactionId,
   }));
+
+  // Aggregate inventory by material for the low stock panel
+  const stockByMaterial = (inventoryItems || []).reduce((acc: Record<string, { name: string; quantity: number }>, item: any) => {
+    const name = item.material_category || item.materialCategory || 'Unknown';
+    if (!acc[name]) acc[name] = { name, quantity: 0 };
+    acc[name].quantity += parseFloat(item.quantity_kg || item.quantityKg || 0);
+    return acc;
+  }, {} as Record<string, { name: string; quantity: number }>);
+  const lowStockList = Object.values(stockByMaterial).filter((m: any) => m.quantity < 10);
 
   return (
     <div className="space-y-6">
@@ -166,10 +181,16 @@ export default function Dashboard() {
                     className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg text-sm"
                   >
                     <div className="flex items-center gap-2 min-w-0">
+                      {transaction.transactionNumber && (
+                        <>
+                          <span className="text-gray-400 whitespace-nowrap">{transaction.transactionNumber}</span>
+                          <span className="text-gray-300">·</span>
+                        </>
+                      )}
                       <span className="font-medium text-gray-900 truncate">{transaction.materialName || '—'}</span>
-                      <span className="text-gray-400">·</span>
+                      <span className="text-gray-300">·</span>
                       <span className="text-gray-500 whitespace-nowrap">{transaction.quantity} kg</span>
-                      <span className="text-gray-400">·</span>
+                      <span className="text-gray-300">·</span>
                       <span className="font-semibold text-gray-900 whitespace-nowrap">${(transaction.totalAmount || 0).toFixed(2)}</span>
                     </div>
                     <span
@@ -200,22 +221,18 @@ export default function Dashboard() {
             <h2 className="text-lg font-semibold text-gray-900">{t('dashboard.lowStockAlerts')}</h2>
           </div>
           <div className="p-4">
-            {!lowStockItems || lowStockItems.length === 0 ? (
+            {lowStockList.length === 0 ? (
               <p className="text-gray-500 text-center py-4">{t('dashboard.allStockGood')}</p>
             ) : (
               <div className="space-y-2">
-                {lowStockItems.map((material) => (
+                {lowStockList.map((material: any) => (
                   <div
-                    key={material.id}
+                    key={material.name}
                     className="flex items-center justify-between p-2.5 bg-red-50 rounded-lg text-sm"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-medium text-gray-900 truncate">{material.name}</span>
-                      <span className="text-gray-400">·</span>
-                      <span className="text-gray-500 capitalize">{material.category}</span>
-                    </div>
+                    <span className="font-medium text-gray-900 truncate">{material.name}</span>
                     <span className="ml-2 font-semibold text-red-600 whitespace-nowrap">
-                      {material.currentStock} {material.unit}
+                      {material.quantity.toFixed(1)} kg
                     </span>
                   </div>
                 ))}
