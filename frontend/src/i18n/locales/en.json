@@ -69,7 +69,16 @@
     "validity": "Validity",
     "purchasePerKg": "Purchase $/kg",
     "salePerKg": "Sale $/kg",
-    "print": "Print"
+    "print": "Print",
+    "welcome": "Welcome",
+    "viewProfile": "View Profile",
+    "changePassword": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "passwordMismatch": "Passwords do not match",
+    "passwordTooShort": "Password must be at least 6 characters",
+    "passwordChanged": "Password changed successfully"
   },
   "nav": {
     "dashboard": "Dashboard",

@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { authAPI } from '@/lib/api';
 import { syncService } from '@/lib/syncService';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -22,19 +24,24 @@ import {
   GitBranch,
   Globe,
   HelpCircle,
+  ChevronDown,
+  User,
+  Lock,
 } from 'lucide-react';
 import packageJson from '../../package.json';
-import { useEffect } from 'react';
-import toast from 'react-hot-toast';
 
 export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const { t, i18n } = useTranslation();
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -57,7 +64,19 @@ export default function Layout() {
     };
   }, [t]);
 
+  // Close user menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleLogout = () => {
+    setShowUserMenu(false);
     logout();
     navigate('/login');
   };
@@ -102,10 +121,6 @@ export default function Layout() {
     { path: '/admin', label: t('nav.adminPanel'), icon: Settings, roles: ['admin', 'manager'] },
   ];
 
-  const helpItems = [
-    { path: '/help', label: t('nav.help'), icon: HelpCircle },
-  ];
-
   const canAccess = (roles?: string[]) => {
     if (!roles) return true;
     return user && roles.includes(user.role);
@@ -134,7 +149,7 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="p-4 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+        <nav className="p-4 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 100px)' }}>
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.path);
@@ -209,44 +224,10 @@ export default function Layout() {
                 })}
             </>
           )}
-
-          {/* Help */}
-          <div className="pt-4 pb-2">
-            <p className="text-xs font-semibold text-gray-400 uppercase px-4">{t('nav.helpSection')}</p>
-          </div>
-          {helpItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname.startsWith(item.path);
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center px-4 py-3 rounded-lg transition-colors ${
-                  isActive
-                    ? 'bg-primary-50 text-primary-700 font-medium'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <Icon className="w-5 h-5 mr-3" />
-                {item.label}
-              </Link>
-            );
-          })}
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
-          <div className="mb-3 text-sm text-gray-600">
-            <p className="font-medium">{user?.fullName}</p>
-            <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center justify-center w-full px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            {t('common.logout')}
-          </button>
-          <div className="mt-3 pt-3 border-t border-gray-100 text-center">
+          <div className="text-center">
             <p className="text-[10px] text-gray-400">v{packageJson.version}</p>
             <p className="text-[10px] text-gray-400">&copy; {new Date().getFullYear()} Panacea</p>
           </div>
@@ -265,7 +246,17 @@ export default function Layout() {
               <Menu className="w-6 h-6" />
             </button>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              {/* Help / User Guide */}
+              <Link
+                to="/help"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title={t('nav.help')}
+              >
+                <HelpCircle className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('nav.help')}</span>
+              </Link>
+
               {/* Language toggle */}
               <button
                 onClick={toggleLanguage}
@@ -277,13 +268,13 @@ export default function Layout() {
               </button>
 
               {/* Sync status */}
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-1.5 text-sm">
                 {isOnline ? (
-                  <Wifi className="w-5 h-5 text-green-600" />
+                  <Wifi className="w-4 h-4 text-green-600" />
                 ) : (
-                  <WifiOff className="w-5 h-5 text-red-600" />
+                  <WifiOff className="w-4 h-4 text-red-600" />
                 )}
-                <span className={isOnline ? 'text-green-600' : 'text-red-600'}>
+                <span className={`hidden sm:inline ${isOnline ? 'text-green-600' : 'text-red-600'}`}>
                   {isOnline ? t('common.online') : t('common.offline')}
                 </span>
               </div>
@@ -295,8 +286,54 @@ export default function Layout() {
                 className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 title={t('common.syncNow')}
               >
-                <RefreshCw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
               </button>
+
+              {/* Divider */}
+              <div className="h-6 w-px bg-gray-200" />
+
+              {/* User menu dropdown */}
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <span className="hidden sm:inline text-gray-500">{t('common.welcome')},</span>
+                  <span className="font-medium">{user?.fullName || 'User'}</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
+                      <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+                    </div>
+                    <button
+                      onClick={() => { setShowUserMenu(false); setShowProfileModal(true); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <User className="w-4 h-4" />
+                      {t('common.viewProfile')}
+                    </button>
+                    <button
+                      onClick={() => { setShowUserMenu(false); setShowPasswordModal(true); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <Lock className="w-4 h-4" />
+                      {t('common.changePassword')}
+                    </button>
+                    <div className="border-t border-gray-100" />
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      {t('common.logout')}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -314,6 +351,161 @@ export default function Layout() {
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />
+      )}
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <ProfileModal user={user} onClose={() => setShowProfileModal(false)} />
+      )}
+    </div>
+  );
+}
+
+// ===== Change Password Modal =====
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error(t('common.passwordMismatch'));
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error(t('common.passwordTooShort'));
+      return;
+    }
+    setSaving(true);
+    try {
+      await authAPI.changePassword(currentPassword, newPassword);
+      toast.success(t('common.passwordChanged'));
+      onClose();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || t('common.error'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-gray-900">{t('common.changePassword')}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('common.currentPassword')}</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('common.newPassword')}</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              minLength={6}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('common.confirmPassword')}</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={6}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50"
+            >
+              {saving ? t('common.loading') : t('common.save')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ===== Profile Modal =====
+function ProfileModal({ user, onClose }: { user: any; onClose: () => void }) {
+  const { t } = useTranslation();
+
+  const fields = [
+    { label: t('common.name'), value: user?.fullName || '-' },
+    { label: t('common.email'), value: user?.email || user?.username || '-' },
+    { label: t('users.role'), value: user?.role || '-' },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-gray-900">{t('common.viewProfile')}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-6">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
+              <User className="w-8 h-8 text-primary-600" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-gray-900">{user?.fullName}</p>
+              <p className="text-sm text-gray-500 capitalize">{user?.role}</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {fields.map((f, i) => (
+              <div key={i} className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">{f.label}</span>
+                <span className="text-sm font-medium text-gray-900 capitalize">{f.value}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end pt-4">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
+            >
+              {t('common.close')}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

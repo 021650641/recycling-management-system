@@ -69,7 +69,16 @@
     "validity": "Vigencia",
     "purchasePerKg": "Compra $/kg",
     "salePerKg": "Venta $/kg",
-    "print": "Imprimir"
+    "print": "Imprimir",
+    "welcome": "Bienvenido",
+    "viewProfile": "Ver Perfil",
+    "changePassword": "Cambiar Contrasena",
+    "currentPassword": "Contrasena Actual",
+    "newPassword": "Nueva Contrasena",
+    "confirmPassword": "Confirmar Contrasena",
+    "passwordMismatch": "Las contrasenas no coinciden",
+    "passwordTooShort": "La contrasena debe tener al menos 6 caracteres",
+    "passwordChanged": "Contrasena cambiada exitosamente"
   },
   "nav": {
     "dashboard": "Panel",

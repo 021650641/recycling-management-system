@@ -40,6 +40,8 @@ export const authAPI = {
     api.post('/auth/login', { email, password }),
   register: (data: any) => api.post('/auth/register', data),
   getCurrentUser: () => api.get('/auth/me'),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.put('/auth/change-password', { currentPassword, newPassword }),
 };
 
 // Transactions API

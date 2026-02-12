@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { reportsAPI } from '@/lib/api';
+import { reportsAPI, transactionsAPI } from '@/lib/api';
 import { Plus, TrendingUp, TrendingDown, Package, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -11,8 +11,9 @@ export default function Dashboard() {
   const { t } = useTranslation();
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [apiTransactions, setApiTransactions] = useState<any[] | null>(null);
 
-  // Get recent transactions from local DB
+  // Get recent transactions from local DB (fallback for offline)
   const recentTransactions = useLiveQuery(
     () => db.transactions.orderBy('createdAt').reverse().limit(5).toArray(),
     []
@@ -26,7 +27,26 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadSummary();
+    loadRecentFromAPI();
   }, []);
+
+  const loadRecentFromAPI = async () => {
+    try {
+      const response = await transactionsAPI.getAll({ limit: 5, offset: 0 });
+      const txs = response.data?.transactions || response.data || [];
+      setApiTransactions(txs.map((tx: any) => ({
+        id: tx.id,
+        type: 'purchase',
+        materialName: tx.material_name || tx.materialName,
+        quantity: parseFloat(tx.weight_kg || tx.quantity || 0),
+        totalAmount: parseFloat(tx.total_cost || tx.totalAmount || 0),
+        paymentStatus: tx.payment_status || tx.paymentStatus || 'pending',
+        transactionNumber: tx.transaction_number || tx.transactionNumber,
+      })));
+    } catch {
+      // Offline - will use local DB
+    }
+  };
 
   const loadSummary = async () => {
     try {
@@ -41,6 +61,17 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
+
+  // Use API data when available, fall back to local DB
+  const displayTransactions = apiTransactions || (recentTransactions || []).map(tx => ({
+    id: tx.id,
+    type: tx.type,
+    materialName: tx.supplierName,
+    quantity: tx.quantity,
+    totalAmount: tx.totalAmount,
+    paymentStatus: tx.paymentStatus,
+    transactionNumber: tx.transactionId,
+  }));
 
   return (
     <div className="space-y-6">
@@ -125,27 +156,27 @@ export default function Dashboard() {
             <h2 className="text-lg font-semibold text-gray-900">{t('dashboard.recentTransactions')}</h2>
           </div>
           <div className="p-4">
-            {!recentTransactions || recentTransactions.length === 0 ? (
+            {displayTransactions.length === 0 ? (
               <p className="text-gray-500 text-center py-4">{t('dashboard.noRecentTransactions')}</p>
             ) : (
               <div className="space-y-3">
-                {recentTransactions.map((transaction) => (
+                {displayTransactions.map((transaction) => (
                   <div
                     key={transaction.id}
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                   >
                     <div>
-                      <p className="font-medium text-gray-900 capitalize">{transaction.type}</p>
+                      <p className="font-medium text-gray-900">{transaction.materialName || t('transactions.material')}</p>
                       <p className="text-sm text-gray-500">
-                        {transaction.supplierName || 'N/A'} - {transaction.quantity} kg
+                        {transaction.transactionNumber || transaction.type} - {transaction.quantity} kg
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-gray-900">
-                        ${transaction.totalAmount.toFixed(2)}
+                        ${(transaction.totalAmount || 0).toFixed(2)}
                       </p>
                       <p
-                        className={`text-xs ${
+                        className={`text-xs capitalize ${
                           transaction.paymentStatus === 'paid'
                             ? 'text-green-600'
                             : 'text-yellow-600'
