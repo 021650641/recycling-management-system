@@ -98,8 +98,21 @@ router.post('/', authorize('admin', 'manager', 'operator'), async (req: any, res
 
     const totalAmount = (parseFloat(weightKg) * parseFloat(saleUnitPrice)).toFixed(2);
 
+    // Read configurable sale prefix from app_settings
+    let salePrefix = 'SL';
+    try {
+      const prefixResult = await query(
+        "SELECT value FROM app_settings WHERE category = 'prefixes' AND key = 'salePrefix'"
+      );
+      if (prefixResult.rows.length > 0 && prefixResult.rows[0].value) {
+        salePrefix = prefixResult.rows[0].value;
+      }
+    } catch {
+      // Table may not exist yet, use default
+    }
+
     // Generate sale number
-    const saleNumber = `SL-${Date.now().toString(36).toUpperCase()}`;
+    const saleNumber = `${salePrefix}-${Date.now().toString(36).toUpperCase()}`;
 
     const result = await query(
       `INSERT INTO sale (

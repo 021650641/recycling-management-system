@@ -52,8 +52,21 @@ router.post('/', authorize('admin', 'manager', 'operator'), async (req: any, res
 
     const totalCost = (parseFloat(weightKg) * parseFloat(unitPrice)).toFixed(2);
 
+    // Read configurable purchase prefix from app_settings
+    let purchasePrefix = 'TX';
+    try {
+      const prefixResult = await query(
+        "SELECT value FROM app_settings WHERE category = 'prefixes' AND key = 'purchasePrefix'"
+      );
+      if (prefixResult.rows.length > 0 && prefixResult.rows[0].value) {
+        purchasePrefix = prefixResult.rows[0].value;
+      }
+    } catch {
+      // Table may not exist yet, use default
+    }
+
     // Generate transaction number
-    const transactionNumber = `TX-${Date.now().toString(36).toUpperCase()}`;
+    const transactionNumber = `${purchasePrefix}-${Date.now().toString(36).toUpperCase()}`;
 
     // Insert transaction
     const result = await query(

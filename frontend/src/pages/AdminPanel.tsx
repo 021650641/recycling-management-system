@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { materialsAPI, locationsAPI, settingsAPI, pricesAPI, usersAPI, logsAPI, schedulesAPI } from '@/lib/api';
 import { api } from '@/lib/api';
-import { Plus, Edit2, Trash2, Save, X, Mail, Settings, Clock, Calendar, Users, FileText, CalendarClock, Bell, Download, Pause, Play, RefreshCw } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Mail, Settings, Clock, Calendar, Users, FileText, CalendarClock, Bell, Download, Pause, Play, RefreshCw, Layers, MapPin, Tag, ChevronDown, ChevronRight } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
 import { useSettingsStore, type DateFormat, type TimeFormat } from '@/store/settingsStore';
@@ -229,32 +229,35 @@ export default function AdminPanel() {
         <nav className="flex gap-8">
           <button
             onClick={() => setActiveTab('materials')}
-            className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+            className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-1.5 ${
               activeTab === 'materials'
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
+            <Layers className="w-4 h-4" />
             {t('admin.materials')}
           </button>
           <button
             onClick={() => setActiveTab('locations')}
-            className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+            className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-1.5 ${
               activeTab === 'locations'
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
+            <MapPin className="w-4 h-4" />
             {t('admin.locations')}
           </button>
           <button
             onClick={() => setActiveTab('pricing')}
-            className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+            className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-1.5 ${
               activeTab === 'pricing'
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
+            <Tag className="w-4 h-4" />
             {t('admin.pricing')}
           </button>
           {currentUser?.role === 'admin' && (
@@ -1538,6 +1541,37 @@ function EmailSettingsTab() {
 function DisplaySettingsTab() {
   const { t } = useTranslation();
   const { dateFormat, timeFormat, setDateFormat, setTimeFormat } = useSettingsStore();
+  const [purchasePrefix, setPurchasePrefix] = useState('TX');
+  const [salePrefix, setSalePrefix] = useState('SL');
+  const [prefixLoading, setPrefixLoading] = useState(true);
+  const [prefixSaving, setPrefixSaving] = useState(false);
+
+  useEffect(() => {
+    settingsAPI.get('prefixes')
+      .then(res => {
+        const data = res.data;
+        if (data && Object.keys(data).length > 0) {
+          setPurchasePrefix(data.purchasePrefix || 'TX');
+          setSalePrefix(data.salePrefix || 'SL');
+        }
+      })
+      .catch(() => {
+        // prefixes may not exist yet, use defaults
+      })
+      .finally(() => setPrefixLoading(false));
+  }, []);
+
+  const handleSavePrefixes = async () => {
+    setPrefixSaving(true);
+    try {
+      await settingsAPI.save('prefixes', { purchasePrefix, salePrefix });
+      toast.success(t('admin.settingsSaved') || 'Settings saved');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || t('common.failedToSave'));
+    } finally {
+      setPrefixSaving(false);
+    }
+  };
 
   const dateFormats: { value: DateFormat; label: string; example: string }[] = [
     { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY', example: '11/02/2026' },
@@ -1557,6 +1591,57 @@ function DisplaySettingsTab() {
         <p className="text-sm text-gray-500 mt-1">{t('admin.displaySettingsDesc')}</p>
       </div>
 
+      {/* Transaction Prefixes */}
+      <div className="bg-white p-6 rounded-lg shadow space-y-4">
+        <div>
+          <h3 className="text-lg font-medium text-gray-900">Transaction Prefixes</h3>
+          <p className="text-sm text-gray-500 mt-1">Configure the prefix codes used for purchase and sale transaction numbers.</p>
+        </div>
+        {prefixLoading ? (
+          <div className="text-sm text-gray-500">{t('common.loading')}</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Purchase Prefix</label>
+                <input
+                  type="text"
+                  value={purchasePrefix}
+                  onChange={(e) => setPurchasePrefix(e.target.value.toUpperCase())}
+                  className="w-full max-w-[200px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono"
+                  placeholder="TX"
+                  maxLength={10}
+                />
+                <p className="text-xs text-gray-500 mt-1">Example: {purchasePrefix}-00001</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sale Prefix</label>
+                <input
+                  type="text"
+                  value={salePrefix}
+                  onChange={(e) => setSalePrefix(e.target.value.toUpperCase())}
+                  className="w-full max-w-[200px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono"
+                  placeholder="SL"
+                  maxLength={10}
+                />
+                <p className="text-xs text-gray-500 mt-1">Example: {salePrefix}-00001</p>
+              </div>
+            </div>
+            <div>
+              <button
+                onClick={handleSavePrefixes}
+                disabled={prefixSaving}
+                className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg disabled:opacity-50 text-sm"
+              >
+                <Save className="w-4 h-4" />
+                {prefixSaving ? t('common.loading') : 'Save Prefixes'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Date & Time Formats */}
       <div className="bg-white p-6 rounded-lg shadow space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">{t('admin.dateFormat')}</label>
@@ -2072,6 +2157,8 @@ function ConfirmationsTab() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showPurchaseParams, setShowPurchaseParams] = useState(false);
+  const [showSaleParams, setShowSaleParams] = useState(false);
   const [settings, setSettings] = useState({
     purchaseEmailEnabled: false,
     saleEmailEnabled: false,
@@ -2079,6 +2166,10 @@ function ConfirmationsTab() {
     saleRecipientField: 'client' as 'client' | 'custom',
     customPurchaseEmail: '',
     customSaleEmail: '',
+    purchaseSubjectTemplate: 'CIVICycle - Purchase Confirmation {{transaction_number}}',
+    purchaseBodyTemplate: '<h2>Purchase Confirmation</h2>\n<p>Transaction {{transaction_number}} for {{weight_kg}} kg of {{material}} has been recorded on {{date}}.</p>\n<p>Vendor: {{vendor_name}}</p>\n<p>Location: {{location}}</p>\n<p>Total: ${{total_cost}}</p>',
+    saleSubjectTemplate: 'CIVICycle - Sale Confirmation {{sale_number}}',
+    saleBodyTemplate: '<h2>Sale Confirmation</h2>\n<p>Sale {{sale_number}} for {{weight_kg}} kg of {{material}} has been recorded on {{date}}.</p>\n<p>Client: {{client_name}}</p>\n<p>Location: {{location}}</p>\n<p>Total: ${{total_amount}}</p>',
   });
 
   useEffect(() => {
@@ -2098,6 +2189,10 @@ function ConfirmationsTab() {
           saleRecipientField: data.saleRecipientField || 'client',
           customPurchaseEmail: data.customPurchaseEmail || '',
           customSaleEmail: data.customSaleEmail || '',
+          purchaseSubjectTemplate: data.purchaseSubjectTemplate || 'CIVICycle - Purchase Confirmation {{transaction_number}}',
+          purchaseBodyTemplate: data.purchaseBodyTemplate || '<h2>Purchase Confirmation</h2>\n<p>Transaction {{transaction_number}} for {{weight_kg}} kg of {{material}} has been recorded on {{date}}.</p>\n<p>Vendor: {{vendor_name}}</p>\n<p>Location: {{location}}</p>\n<p>Total: ${{total_cost}}</p>',
+          saleSubjectTemplate: data.saleSubjectTemplate || 'CIVICycle - Sale Confirmation {{sale_number}}',
+          saleBodyTemplate: data.saleBodyTemplate || '<h2>Sale Confirmation</h2>\n<p>Sale {{sale_number}} for {{weight_kg}} kg of {{material}} has been recorded on {{date}}.</p>\n<p>Client: {{client_name}}</p>\n<p>Location: {{location}}</p>\n<p>Total: ${{total_amount}}</p>',
         });
       }
     } catch {
@@ -2118,6 +2213,10 @@ function ConfirmationsTab() {
       setSaving(false);
     }
   };
+
+  const commonParams = ['{{day}}', '{{month}}', '{{month_number}}', '{{year}}', '{{date}}'];
+  const purchaseParams = ['{{transaction_number}}', '{{vendor_name}}', '{{vendor_email}}', '{{material}}', '{{location}}', '{{weight_kg}}', '{{unit_price}}', '{{total_cost}}', '{{payment_method}}', '{{notes}}'];
+  const saleParams = ['{{sale_number}}', '{{client_name}}', '{{client_email}}', '{{material}}', '{{location}}', '{{weight_kg}}', '{{unit_price}}', '{{total_amount}}', '{{payment_method}}', '{{notes}}'];
 
   if (loading) return <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>;
 
@@ -2150,7 +2249,7 @@ function ConfirmationsTab() {
           </div>
 
           {settings.purchaseEmailEnabled && (
-            <div className="ml-4 pl-4 border-l-2 border-gray-200 space-y-3">
+            <div className="ml-4 pl-4 border-l-2 border-gray-200 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Recipient</label>
                 <select
@@ -2174,6 +2273,52 @@ function ConfirmationsTab() {
                   />
                 </div>
               )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Subject Template</label>
+                <input
+                  type="text"
+                  value={settings.purchaseSubjectTemplate}
+                  onChange={(e) => setSettings({ ...settings, purchaseSubjectTemplate: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm"
+                  placeholder="CIVICycle - Purchase Confirmation {{transaction_number}}"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Body Template (HTML)</label>
+                <textarea
+                  rows={6}
+                  value={settings.purchaseBodyTemplate}
+                  onChange={(e) => setSettings({ ...settings, purchaseBodyTemplate: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm"
+                  placeholder="<h2>Purchase Confirmation</h2>..."
+                />
+              </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowPurchaseParams(!showPurchaseParams)}
+                  className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-800"
+                >
+                  {showPurchaseParams ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  Show available parameters
+                </button>
+                {showPurchaseParams && (
+                  <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs space-y-2">
+                    <div>
+                      <span className="font-semibold text-gray-700">Common:</span>{' '}
+                      {commonParams.map((p, i) => (
+                        <span key={p}><code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800">{p}</code>{i < commonParams.length - 1 ? ' ' : ''}</span>
+                      ))}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-gray-700">Purchase:</span>{' '}
+                      {purchaseParams.map((p, i) => (
+                        <span key={p}><code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800">{p}</code>{i < purchaseParams.length - 1 ? ' ' : ''}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -2199,7 +2344,7 @@ function ConfirmationsTab() {
           </div>
 
           {settings.saleEmailEnabled && (
-            <div className="ml-4 pl-4 border-l-2 border-gray-200 space-y-3">
+            <div className="ml-4 pl-4 border-l-2 border-gray-200 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Recipient</label>
                 <select
@@ -2223,6 +2368,52 @@ function ConfirmationsTab() {
                   />
                 </div>
               )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Subject Template</label>
+                <input
+                  type="text"
+                  value={settings.saleSubjectTemplate}
+                  onChange={(e) => setSettings({ ...settings, saleSubjectTemplate: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm"
+                  placeholder="CIVICycle - Sale Confirmation {{sale_number}}"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Body Template (HTML)</label>
+                <textarea
+                  rows={6}
+                  value={settings.saleBodyTemplate}
+                  onChange={(e) => setSettings({ ...settings, saleBodyTemplate: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm"
+                  placeholder="<h2>Sale Confirmation</h2>..."
+                />
+              </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowSaleParams(!showSaleParams)}
+                  className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-800"
+                >
+                  {showSaleParams ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  Show available parameters
+                </button>
+                {showSaleParams && (
+                  <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs space-y-2">
+                    <div>
+                      <span className="font-semibold text-gray-700">Common:</span>{' '}
+                      {commonParams.map((p, i) => (
+                        <span key={p}><code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800">{p}</code>{i < commonParams.length - 1 ? ' ' : ''}</span>
+                      ))}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-gray-700">Sale:</span>{' '}
+                      {saleParams.map((p, i) => (
+                        <span key={p}><code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800">{p}</code>{i < saleParams.length - 1 ? ' ' : ''}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

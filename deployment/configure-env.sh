@@ -100,6 +100,8 @@ if [ -f "$BACKEND_ENV_FILE" ]; then
     log_info "Backed up existing backend .env"
 fi
 
+ENCRYPTION_KEY=$(openssl rand -base64 32)
+
 cat > "$BACKEND_ENV_FILE" <<EOF
 # Node Environment
 NODE_ENV=$NODE_ENV
@@ -131,6 +133,9 @@ RATE_LIMIT_MAX_REQUESTS=100
 
 # File Upload
 MAX_FILE_SIZE=10485760
+
+# Encryption Key (for sensitive data like government IDs)
+ENCRYPTION_KEY=$ENCRYPTION_KEY
 EOF
 
 chmod 600 "$BACKEND_ENV_FILE"
@@ -205,6 +210,9 @@ RATE_LIMIT_MAX_REQUESTS=100
 
 # File Upload
 MAX_FILE_SIZE=10485760
+
+# Encryption Key (for sensitive data - generate with: openssl rand -base64 32)
+ENCRYPTION_KEY=your_encryption_key_here
 EOF
 
 cat > "$INSTALL_DIR/frontend/.env.example" <<'EOF'
@@ -264,6 +272,7 @@ Frontend Environment:
 
 Security:
   JWT Secret: [CONFIGURED - $(echo ${#JWT_SECRET} chars)]
+  Encryption Key: [CONFIGURED - AES-256]
   Session Secret: [CONFIGURED]
 
 Notes:

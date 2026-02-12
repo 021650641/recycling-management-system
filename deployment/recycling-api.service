@@ -12,12 +12,14 @@ User=deploy
 Group=deploy
 WorkingDirectory=/var/www/recycling/backend
 ExecStartPre=+/bin/sh -c 'fuser -k 5000/tcp 2>/dev/null; sleep 2; exit 0'
+ExecStartPre=+/bin/bash -c 'mkdir -p /var/www/recycling/backend/logs && chown nebula-deploy:nebula-deploy /var/www/recycling/backend/logs'
 ExecStart=/usr/bin/node dist/server.js
 Restart=on-failure
 RestartSec=5
 
 # Environment
 Environment=NODE_ENV=production
+Environment=LOG_DIR=/var/www/recycling/backend/logs
 EnvironmentFile=/var/www/recycling/backend/.env
 
 # Process management

@@ -5,6 +5,7 @@ import { transactionsAPI, salesAPI, clientsAPI, materialsAPI, locationsAPI } fro
 import {
   Plus, Filter, Search, Save, X, DollarSign, Truck,
   ShoppingCart, ArrowLeftRight, FileText, RotateCcw, Eye,
+  ChevronDown, ChevronRight, Printer,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -164,6 +165,28 @@ function TransactionDetailModal({ transaction, onClose }: { transaction: any; on
     { label: t('transactions.qualityGrade'), value: tx.quality_grade || 'standard' },
     { label: t('common.notes'), value: tx.notes || '-' },
   ];
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html><head><title>${tx.transaction_number}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 40px; }
+        h1 { font-size: 18px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+        td:first-child { font-weight: bold; color: #6b7280; width: 40%; }
+        @media print { body { padding: 20px; } }
+      </style></head><body>
+      <h1>CIVICycle - ${t('transactions.transactionNumber')} ${tx.transaction_number}</h1>
+      <table>${fields.map(f => `<tr><td>${f.label}</td><td>${f.value}</td></tr>`).join('')}</table>
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
@@ -171,7 +194,12 @@ function TransactionDetailModal({ transaction, onClose }: { transaction: any; on
           <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
             <Eye className="w-5 h-5" /> {t('transactions.transactionNumber')}: {tx.transaction_number}
           </h3>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5" /></button>
+          <div className="flex items-center gap-1">
+            <button onClick={handlePrint} className="p-1 hover:bg-gray-100 rounded" title="Print">
+              <Printer className="w-5 h-5" />
+            </button>
+            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5" /></button>
+          </div>
         </div>
         <div className="p-4">
           <table className="w-full">
@@ -208,6 +236,28 @@ function SaleDetailModal({ sale, onClose }: { sale: any; onClose: () => void }) 
     { label: t('sales.deliveryStatus'), value: sale.delivery_status || 'pending' },
     { label: t('common.notes'), value: sale.notes || '-' },
   ];
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html><head><title>${sale.sale_number}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 40px; }
+        h1 { font-size: 18px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+        td:first-child { font-weight: bold; color: #6b7280; width: 40%; }
+        @media print { body { padding: 20px; } }
+      </style></head><body>
+      <h1>CIVICycle - ${t('sales.saleNumber')} ${sale.sale_number}</h1>
+      <table>${fields.map(f => `<tr><td>${f.label}</td><td>${f.value}</td></tr>`).join('')}</table>
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
@@ -215,7 +265,12 @@ function SaleDetailModal({ sale, onClose }: { sale: any; onClose: () => void }) 
           <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
             <Eye className="w-5 h-5" /> {t('sales.saleNumber')}: {sale.sale_number}
           </h3>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5" /></button>
+          <div className="flex items-center gap-1">
+            <button onClick={handlePrint} className="p-1 hover:bg-gray-100 rounded" title="Print">
+              <Printer className="w-5 h-5" />
+            </button>
+            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5" /></button>
+          </div>
         </div>
         <div className="p-4">
           <table className="w-full">
@@ -246,6 +301,7 @@ function PurchasesTab() {
   const [editingNotes, setEditingNotes] = useState<{ id: string; notes: string } | null>(null);
   const [voidingId, setVoidingId] = useState<string | null>(null);
   const [viewingTx, setViewingTx] = useState<any>(null);
+  const [collapsedPairs, setCollapsedPairs] = useState<Set<string>>(new Set());
 
   useEffect(() => { loadData(); }, []);
 
@@ -333,6 +389,25 @@ function PurchasesTab() {
 
   const hasReversal = (txNum: string) => transactions.some(t => t.transaction_number === `REV-${txNum}`);
 
+  const toggleCollapse = (txNum: string) => {
+    setCollapsedPairs(prev => {
+      const next = new Set(prev);
+      if (next.has(txNum)) {
+        next.delete(txNum);
+      } else {
+        next.add(txNum);
+      }
+      return next;
+    });
+  };
+
+  // By default reversals are collapsed. A pair is "expanded" only if the txNum is in collapsedPairs (toggled open).
+  const isExpanded = (txNum: string) => collapsedPairs.has(txNum);
+
+  const handlePrintTable = () => {
+    window.print();
+  };
+
   const stats = {
     total: transactions?.length || 0,
     apartment: transactions?.filter(tx => tx.source_type === 'apartment').length || 0,
@@ -367,7 +442,7 @@ function PurchasesTab() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow space-y-4">
+      <div className="bg-white p-4 rounded-lg shadow space-y-4 print:hidden">
         <div className="flex items-center gap-2 text-gray-700 font-medium">
           <Filter className="w-5 h-5" /> {t('transactions.filters')}
         </div>
@@ -405,6 +480,13 @@ function PurchasesTab() {
 
       {/* Transactions Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 print:hidden">
+          <h2 className="text-sm font-medium text-gray-700">{t('transactions.purchasesTab')}</h2>
+          <button onClick={handlePrintTable} className="flex items-center gap-1 text-gray-600 hover:text-gray-800 p-1.5 hover:bg-gray-100 rounded" title="Print table">
+            <Printer className="w-4 h-4" />
+            <span className="text-xs">{t('common.print') || 'Print'}</span>
+          </button>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -416,7 +498,7 @@ function PurchasesTab() {
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{t('transactions.weightKg')}</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{t('transactions.totalCost')}</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{t('common.status')}</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('common.actions')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:hidden">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -430,15 +512,34 @@ function PurchasesTab() {
                   const isRev = txNum.startsWith('REV-');
                   const txHasReversal = !isRev && hasReversal(txNum);
 
+                  // If this is a reversal row and the original is collapsed, hide it
+                  if (isRev) {
+                    const origNum = txNum.replace('REV-', '');
+                    if (!isExpanded(origNum)) {
+                      return null;
+                    }
+                  }
+
                   return (
                     <tr key={tx.transaction_id || tx.id}
                       className={`hover:bg-gray-50 cursor-pointer ${isRev ? 'bg-red-50' : txHasReversal ? 'bg-orange-50' : ''}`}
                       onClick={() => setViewingTx(tx)}>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        {isRev && <span className="inline-block w-3 border-l-2 border-red-400 mr-1">&nbsp;</span>}
-                        {txNum}
-                        {isRev && <span className="ml-2 inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-red-100 text-red-700">{t('transactions.reversed')}</span>}
-                        {txHasReversal && <span className="ml-2 inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-orange-100 text-orange-700">{t('transactions.reversed')}</span>}
+                        <div className="flex items-center">
+                          {txHasReversal && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleCollapse(txNum); }}
+                              className="mr-1 p-0.5 hover:bg-gray-200 rounded"
+                            >
+                              {isExpanded(txNum) ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+                            </button>
+                          )}
+                          {isRev && <span className="inline-block w-3 border-l-2 border-red-400 mr-1">&nbsp;</span>}
+                          {!txHasReversal && !isRev && <span className="inline-block w-5 mr-1" />}
+                          {txNum}
+                          {isRev && <span className="ml-2 inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-red-100 text-red-700">{t('transactions.reversing')}</span>}
+                          {txHasReversal && <span className="ml-2 inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-orange-100 text-orange-700">{t('transactions.reversed')}</span>}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">{format(new Date(tx.transaction_date || tx.created_at), 'MMM dd, yyyy')}</td>
                       <td className="px-4 py-3 text-sm text-gray-900">{tx.material_category || '-'}</td>
@@ -456,7 +557,7 @@ function PurchasesTab() {
                           {tx.payment_status === 'paid' ? t('transactions.paid') : tx.payment_status === 'partial' ? t('transactions.partial') : t('transactions.pending')}
                         </span>
                       </td>
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-4 py-3 print:hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-1">
                           <button onClick={() => setViewingTx(tx)} className="text-gray-600 hover:text-gray-800 p-1" title={t('common.view')}>
                             <Eye className="w-4 h-4" />
@@ -524,6 +625,7 @@ function SalesTab() {
   const [editingNotes, setEditingNotes] = useState<{ id: string; notes: string } | null>(null);
   const [voidingId, setVoidingId] = useState<string | null>(null);
   const [viewingSale, setViewingSale] = useState<any>(null);
+  const [collapsedPairs, setCollapsedPairs] = useState<Set<string>>(new Set());
 
   useEffect(() => { loadData(); loadFormOptions(); }, []);
 
@@ -618,6 +720,25 @@ function SalesTab() {
 
   const hasReversal = (saleNum: string) => sales.some(s => s.sale_number === `REV-${saleNum}`);
 
+  const toggleCollapse = (saleNum: string) => {
+    setCollapsedPairs(prev => {
+      const next = new Set(prev);
+      if (next.has(saleNum)) {
+        next.delete(saleNum);
+      } else {
+        next.add(saleNum);
+      }
+      return next;
+    });
+  };
+
+  // By default reversals are collapsed. A pair is "expanded" only if the saleNum is in collapsedPairs (toggled open).
+  const isExpanded = (saleNum: string) => collapsedPairs.has(saleNum);
+
+  const handlePrintTable = () => {
+    window.print();
+  };
+
   // Group sales: reversals directly after originals
   const groupedSales = (() => {
     const originals = sales.filter(s => !(s.sale_number || '').startsWith('REV-'));
@@ -671,6 +792,13 @@ function SalesTab() {
         <div className="text-center py-12 text-gray-500">{t('sales.loading')}</div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 print:hidden">
+            <h2 className="text-sm font-medium text-gray-700">{t('transactions.salesTab')}</h2>
+            <button onClick={handlePrintTable} className="flex items-center gap-1 text-gray-600 hover:text-gray-800 p-1.5 hover:bg-gray-100 rounded" title="Print table">
+              <Printer className="w-4 h-4" />
+              <span className="text-xs">{t('common.print') || 'Print'}</span>
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
@@ -683,7 +811,7 @@ function SalesTab() {
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('common.total')}</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">{t('sales.payment')}</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">{t('sales.delivery')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.actions')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase print:hidden">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -694,15 +822,34 @@ function SalesTab() {
                     const isRev = sale.sale_number?.startsWith('REV-');
                     const saleHasReversal = !isRev && hasReversal(sale.sale_number);
 
+                    // If this is a reversal row and the original is collapsed, hide it
+                    if (isRev) {
+                      const origNum = (sale.sale_number || '').replace('REV-', '');
+                      if (!isExpanded(origNum)) {
+                        return null;
+                      }
+                    }
+
                     return (
                       <tr key={sale.id}
                         className={`hover:bg-gray-50 cursor-pointer ${isRev ? 'bg-red-50' : saleHasReversal ? 'bg-orange-50' : ''}`}
                         onClick={() => setViewingSale(sale)}>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                          {isRev && <span className="inline-block w-3 border-l-2 border-red-400 mr-1">&nbsp;</span>}
-                          {sale.sale_number}
-                          {isRev && <span className="ml-2 inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-red-100 text-red-700">{t('transactions.reversed')}</span>}
-                          {saleHasReversal && <span className="ml-2 inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-orange-100 text-orange-700">{t('transactions.reversed')}</span>}
+                          <div className="flex items-center">
+                            {saleHasReversal && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleCollapse(sale.sale_number); }}
+                                className="mr-1 p-0.5 hover:bg-gray-200 rounded"
+                              >
+                                {isExpanded(sale.sale_number) ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+                              </button>
+                            )}
+                            {isRev && <span className="inline-block w-3 border-l-2 border-red-400 mr-1">&nbsp;</span>}
+                            {!saleHasReversal && !isRev && <span className="inline-block w-5 mr-1" />}
+                            {sale.sale_number}
+                            {isRev && <span className="ml-2 inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-red-100 text-red-700">{t('transactions.reversing')}</span>}
+                            {saleHasReversal && <span className="ml-2 inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-orange-100 text-orange-700">{t('transactions.reversed')}</span>}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900">{sale.sale_date ? new Date(sale.sale_date).toLocaleDateString() : '-'}</td>
                         <td className="px-4 py-3 text-sm text-gray-900">{sale.client_name || '-'}</td>
@@ -711,7 +858,7 @@ function SalesTab() {
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">${Number(sale.total_amount || 0).toFixed(2)}</td>
                         <td className="px-4 py-3 text-center">{getStatusBadge(sale.payment_status)}</td>
                         <td className="px-4 py-3 text-center">{getStatusBadge(sale.delivery_status || 'not_delivered')}</td>
-                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-4 py-3 print:hidden" onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-1">
                             <button onClick={() => setViewingSale(sale)} className="text-gray-600 hover:text-gray-800 p-1" title={t('common.view')}>
                               <Eye className="w-4 h-4" />

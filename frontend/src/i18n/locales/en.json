@@ -68,7 +68,8 @@
     "filterByDate": "Filter by date:",
     "validity": "Validity",
     "purchasePerKg": "Purchase $/kg",
-    "salePerKg": "Sale $/kg"
+    "salePerKg": "Sale $/kg",
+    "print": "Print"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -185,7 +186,12 @@
     "voidError": "Failed to void transaction",
     "paymentUpdateError": "Failed to update payment",
     "reversed": "Reversed",
-    "void": "Void"
+    "reversing": "Reversing",
+    "void": "Void",
+    "print": "Print",
+    "printTable": "Print Table",
+    "collapseAll": "Collapse All",
+    "expandAll": "Expand All"
   },
   "inventory": {
     "title": "Inventory Management",
@@ -416,7 +422,9 @@
     "mobileMoney": "Mobile Money",
     "inTransit": "In Transit",
     "notDelivered": "Not Delivered",
-    "partial": "Partial"
+    "partial": "Partial",
+    "reversed": "Reversed",
+    "reversing": "Reversing"
   },
   "traceability": {
     "title": "Traceability",
@@ -533,7 +541,24 @@
     "vendorEmail": "Vendor Email",
     "clientEmail": "Client Email",
     "customEmail": "Custom Email",
-    "confirmationsSaved": "Confirmation settings saved"
+    "confirmationsSaved": "Confirmation settings saved",
+    "settingsSaved": "Settings saved",
+    "subjectTemplate": "Subject Template",
+    "bodyTemplate": "Body Template (HTML)",
+    "showParameters": "Show available parameters",
+    "hideParameters": "Hide parameters",
+    "commonParameters": "Common",
+    "purchaseParameters": "Purchase-specific",
+    "saleParameters": "Sale-specific",
+    "prefixes": "Prefixes",
+    "prefixesDesc": "Configure custom prefixes for transaction and sale numbers.",
+    "purchasePrefix": "Purchase Prefix",
+    "purchasePrefixHint": "Default: TX (e.g. TX-ABC123)",
+    "salePrefix": "Sale Prefix",
+    "salePrefixHint": "Default: SL (e.g. SL-ABC123)",
+    "prefixesSaved": "Prefixes saved",
+    "encryption": "Encryption",
+    "encryptionDesc": "Database encryption is enabled. Sensitive data (government IDs) is encrypted at rest using AES-256."
   },
   "users": {
     "title": "User Management",

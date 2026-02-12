@@ -33,6 +33,7 @@ interface Config {
     password: string;
     from: string;
   };
+  encryptionKey: string;
 }
 
 export const config: Config = {
@@ -71,6 +72,8 @@ export const config: Config = {
     password: process.env.SMTP_PASSWORD || '',
     from: process.env.SMTP_FROM || '',
   },
+
+  encryptionKey: process.env.ENCRYPTION_KEY || '',
 };
 
 export const isDevelopment = config.nodeEnv === 'development';

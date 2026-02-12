@@ -68,7 +68,8 @@
     "filterByDate": "Filtrar por fecha:",
     "validity": "Vigencia",
     "purchasePerKg": "Compra $/kg",
-    "salePerKg": "Venta $/kg"
+    "salePerKg": "Venta $/kg",
+    "print": "Imprimir"
   },
   "nav": {
     "dashboard": "Panel",
@@ -185,7 +186,12 @@
     "voidError": "Error al anular transaccion",
     "paymentUpdateError": "Error al actualizar pago",
     "reversed": "Reversado",
-    "void": "Anular"
+    "reversing": "Reversando",
+    "void": "Anular",
+    "print": "Imprimir",
+    "printTable": "Imprimir Tabla",
+    "collapseAll": "Contraer Todo",
+    "expandAll": "Expandir Todo"
   },
   "inventory": {
     "title": "Gestion de Inventario",
@@ -416,7 +422,9 @@
     "mobileMoney": "Dinero Movil",
     "inTransit": "En Transito",
     "notDelivered": "No Entregado",
-    "partial": "Parcial"
+    "partial": "Parcial",
+    "reversed": "Reversado",
+    "reversing": "Reversando"
   },
   "traceability": {
     "title": "Trazabilidad",
@@ -533,7 +541,24 @@
     "vendorEmail": "Email del Vendedor",
     "clientEmail": "Email del Cliente",
     "customEmail": "Email Personalizado",
-    "confirmationsSaved": "Configuracion de confirmaciones guardada"
+    "confirmationsSaved": "Configuracion de confirmaciones guardada",
+    "settingsSaved": "Configuracion guardada",
+    "subjectTemplate": "Plantilla de Asunto",
+    "bodyTemplate": "Plantilla del Cuerpo (HTML)",
+    "showParameters": "Mostrar parametros disponibles",
+    "hideParameters": "Ocultar parametros",
+    "commonParameters": "Comunes",
+    "purchaseParameters": "Especificos de Compra",
+    "saleParameters": "Especificos de Venta",
+    "prefixes": "Prefijos",
+    "prefixesDesc": "Configure prefijos personalizados para numeros de transacciones y ventas.",
+    "purchasePrefix": "Prefijo de Compra",
+    "purchasePrefixHint": "Por defecto: TX (ej. TX-ABC123)",
+    "salePrefix": "Prefijo de Venta",
+    "salePrefixHint": "Por defecto: SL (ej. SL-ABC123)",
+    "prefixesSaved": "Prefijos guardados",
+    "encryption": "Encriptacion",
+    "encryptionDesc": "La encriptacion de base de datos esta habilitada. Los datos sensibles (IDs gubernamentales) estan encriptados en reposo con AES-256."
   },
   "users": {
     "title": "Gestion de Usuarios",
