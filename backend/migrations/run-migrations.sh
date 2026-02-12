@@ -18,22 +18,33 @@ if [ -f "$BACKEND_DIR/.env" ]; then
     set +a
 fi
 
-# Build connection string from individual vars (matching config.ts defaults)
+# Build connection details from individual vars (matching config.ts defaults)
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-recycling_db}"
 DB_USER="${DB_USER:-recycling_user}"
 
-export PGHOST="$DB_HOST"
-export PGPORT="$DB_PORT"
-export PGDATABASE="$DB_NAME"
-export PGUSER="$DB_USER"
-export PGPASSWORD="$DB_PASSWORD"
+# Determine how to invoke psql:
+# - If DB_PASSWORD is set, use it via PGPASSWORD env var
+# - Otherwise, use sudo -u postgres for local peer authentication
+if [ -n "$DB_PASSWORD" ]; then
+    PSQL_CMD="psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME"
+    export PGPASSWORD="$DB_PASSWORD"
+    echo "[migrations] Connecting to $DB_NAME@$DB_HOST:$DB_PORT as $DB_USER (password auth)"
+else
+    PSQL_CMD="sudo -u postgres psql -d $DB_NAME"
+    echo "[migrations] Connecting to $DB_NAME via sudo -u postgres (peer auth)"
+fi
 
-echo "[migrations] Connecting to $DB_NAME@$DB_HOST:$DB_PORT as $DB_USER"
+# Test connection
+if ! $PSQL_CMD -c "SELECT 1" > /dev/null 2>&1; then
+    echo "[migrations] ERROR: Cannot connect to database $DB_NAME"
+    echo "[migrations] Check your .env file at $BACKEND_DIR/.env"
+    exit 1
+fi
 
 # Create migrations tracking table if it doesn't exist
-psql -q <<'SQL'
+$PSQL_CMD -q <<'SQL'
 CREATE TABLE IF NOT EXISTS schema_migrations (
     filename VARCHAR(255) PRIMARY KEY,
     applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -49,7 +60,7 @@ for migration in "$SCRIPT_DIR"/[0-9]*.sql; do
     filename=$(basename "$migration")
 
     # Check if already applied
-    already=$(psql -tAq -c "SELECT COUNT(*) FROM schema_migrations WHERE filename = '$filename'")
+    already=$($PSQL_CMD -tAq -c "SELECT COUNT(*) FROM schema_migrations WHERE filename = '$filename'")
 
     if [ "$already" -gt 0 ]; then
         SKIPPED=$((SKIPPED + 1))
@@ -57,8 +68,8 @@ for migration in "$SCRIPT_DIR"/[0-9]*.sql; do
     fi
 
     echo "[migrations] Applying $filename ..."
-    psql -q -f "$migration"
-    psql -q -c "INSERT INTO schema_migrations (filename) VALUES ('$filename')"
+    $PSQL_CMD -q -f "$migration"
+    $PSQL_CMD -q -c "INSERT INTO schema_migrations (filename) VALUES ('$filename')"
     APPLIED=$((APPLIED + 1))
     echo "[migrations] Applied $filename"
 done
