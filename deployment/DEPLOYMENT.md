@@ -1,187 +1,394 @@
-# VPS Deployment Guide
+# CIVICycle - Deployment and Installation Guide
 
-Complete guide for deploying the Recycling Management System on a dedicated VPS.
+Complete guide for deploying the CIVICycle Recycling Management System on a fresh VM or VPS.
 
 ## Table of Contents
 
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Manual Installation](#manual-installation)
-- [Configuration](#configuration)
-- [Maintenance](#maintenance)
+- [Server Requirements](#server-requirements)
+- [Architecture Overview](#architecture-overview)
+- [Quick Start (Automated)](#quick-start-automated)
+- [Step-by-Step Manual Installation](#step-by-step-manual-installation)
+  - [1. System Preparation](#1-system-preparation)
+  - [2. PostgreSQL Setup](#2-postgresql-setup)
+  - [3. Application Installation](#3-application-installation)
+  - [4. Backend Configuration](#4-backend-configuration)
+  - [5. Frontend Configuration](#5-frontend-configuration)
+  - [6. Database Initialization](#6-database-initialization)
+  - [7. systemd Service Setup](#7-systemd-service-setup)
+  - [8. Nginx Configuration](#8-nginx-configuration)
+  - [9. SSL Certificate](#9-ssl-certificate)
+  - [10. Firewall](#10-firewall)
+- [Post-Installation Verification](#post-installation-verification)
+- [Environment Variables Reference](#environment-variables-reference)
+- [Maintenance and Operations](#maintenance-and-operations)
+  - [Updating the Application](#updating-the-application)
+  - [Database Migrations](#database-migrations)
+  - [Backups](#backups)
+  - [Log Management](#log-management)
 - [Troubleshooting](#troubleshooting)
-- [Security](#security)
+- [Rollback Procedures](#rollback-procedures)
+- [Security Hardening](#security-hardening)
+- [Multi-VM / Scaling Considerations](#multi-vm--scaling-considerations)
 
-## Prerequisites
+---
 
-### Server Requirements
+## Server Requirements
 
-- **OS**: Ubuntu 20.04+ or Debian 11+
-- **RAM**: Minimum 2GB (4GB recommended)
-- **Storage**: Minimum 20GB
-- **CPU**: 2+ cores recommended
-- **Domain**: A domain name pointing to your server's IP
+| Resource     | Minimum         | Recommended     |
+|--------------|-----------------|-----------------|
+| OS           | Ubuntu 20.04 LTS or Debian 11 | Ubuntu 22.04 LTS |
+| CPU          | 1 core          | 2+ cores        |
+| RAM          | 2 GB            | 4 GB            |
+| Disk         | 20 GB           | 40 GB           |
+| Network      | Public IP       | Public IP + domain |
 
-### Required Software
+### Software Prerequisites
 
-The deployment script will install these automatically:
-- Node.js 20.x
-- PostgreSQL 14+
-- Nginx
-- Git
-- Certbot (for SSL)
+The installation will set up:
 
-### DNS Configuration
+- **Node.js 20.x** (LTS) - JavaScript runtime
+- **PostgreSQL 14+** - Relational database
+- **Nginx** - Reverse proxy and static file server
+- **Git** - Source code management
+- **Certbot** - SSL certificate management (optional)
 
-Before deployment, point your domain to your VPS:
+### DNS Requirements
+
+Before starting, create an A record pointing your domain to the server's public IP:
 
 ```
-A Record: yourdomain.com -> YOUR_SERVER_IP
+A    yourdomain.com    ->  YOUR_SERVER_IP
 ```
 
-Wait for DNS propagation (5-30 minutes).
-
-## Quick Start
-
-### One-Command Deployment
+Allow 5-30 minutes for DNS propagation. You can verify with:
 
 ```bash
-# Clone repository
+dig +short yourdomain.com
+```
+
+---
+
+## Architecture Overview
+
+```
+                          Internet
+                            |
+                            | HTTPS (443) / HTTP (80)
+                            v
+                    +---------------+
+                    |     Nginx     |
+                    | - SSL termination
+                    | - Static files (frontend/dist)
+                    | - Reverse proxy for /api/*
+                    +-------+-------+
+                            |
+              +-------------+-------------+
+              |                           |
+         /api/* proxy              /* static files
+         port 5000
+              v                           v
+     +----------------+     +------------------------+
+     |  Backend API   |     |   Frontend (Static)    |
+     |  Node.js       |     |   React SPA            |
+     |  Express       |     |   Vite build output    |
+     |  systemd       |     |   PWA + offline        |
+     +-------+--------+     +------------------------+
+              |
+              | TCP 5432
+              v
+     +----------------+
+     |  PostgreSQL    |
+     |  recycling_db  |
+     |  systemd       |
+     +----------------+
+```
+
+All three services (PostgreSQL, Backend API, Nginx) run on the same VM and are managed by systemd.
+
+---
+
+## Quick Start (Automated)
+
+For a fully automated deployment on a fresh VM:
+
+```bash
+# 1. Clone the repository
 git clone https://github.com/021650641/recycling-management-system.git
 cd recycling-management-system/deployment
 
-# Make scripts executable
+# 2. Make scripts executable
 chmod +x *.sh
 
-# Run automated deployment
+# 3. Run the automated deployment
 ./deploy.sh
 ```
 
-The script will prompt you for:
+The script interactively prompts for:
 - Domain name
-- Database credentials
+- Installation directory (default: `/var/www/recycling`)
+- PostgreSQL credentials
 - JWT secret
+- API port (default: 5000)
 - SSL certificate email
 
-### What Gets Installed
+The script handles system updates, dependency installation, database creation, application builds, Nginx configuration, systemd service setup, SSL, and firewall configuration.
 
-1. System updates and dependencies
-2. PostgreSQL database with optimized configuration
-3. Node.js backend API
-4. React frontend (built)
-5. Nginx web server
-6. SSL certificate (Let's Encrypt)
-7. systemd service for backend process management
-8. Firewall configuration
+> **Note:** Do not run `deploy.sh` as root. Run as a regular user with sudo privileges.
 
-## Manual Installation
+---
 
-If you prefer step-by-step control:
+## Step-by-Step Manual Installation
 
-### 1. System Setup
+Use this approach when you need full control over each step, or when the automated script doesn't fit your environment.
+
+### 1. System Preparation
 
 ```bash
-# Update system
+# Update system packages
 sudo apt update && sudo apt upgrade -y
 
-# Install Node.js
+# Install Node.js 20.x
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
+
+# Verify Node.js
+node --version   # Should show v20.x.x
+npm --version    # Should show 10.x.x
 
 # Install PostgreSQL
 sudo apt install -y postgresql postgresql-contrib
 
-# Install Nginx
-sudo apt install -y nginx
-
-# Install other tools
-sudo apt install -y git curl ufw certbot python3-certbot-nginx
+# Install Nginx and other tools
+sudo apt install -y nginx git curl build-essential certbot python3-certbot-nginx
 ```
 
-### 2. Database Setup
+### 2. PostgreSQL Setup
+
+#### Option A: Use the interactive script
 
 ```bash
-# Run database initialization script
+cd deployment
+chmod +x init-database.sh
 ./init-database.sh
 ```
 
-Or manually:
+This creates the database, user, enables required extensions (`uuid-ossp`, `pg_trgm`), and tunes PostgreSQL for available RAM.
+
+#### Option B: Manual setup
 
 ```bash
-sudo -u postgres psql <<EOF
-CREATE DATABASE recycling_db;
-CREATE USER recycling_user WITH PASSWORD 'your_password';
+sudo -u postgres psql <<'EOF'
+-- Create application user
+CREATE USER recycling_user WITH ENCRYPTED PASSWORD 'YOUR_SECURE_PASSWORD';
+
+-- Create database owned by the app user
+CREATE DATABASE recycling_db WITH OWNER recycling_user;
+
+-- Grant privileges
 GRANT ALL PRIVILEGES ON DATABASE recycling_db TO recycling_user;
+
+-- Connect to the new database
+\c recycling_db
+
+-- Grant schema privileges
+GRANT ALL ON SCHEMA public TO recycling_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO recycling_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO recycling_user;
+
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 EOF
 ```
 
-### 3. Clone and Configure
+#### Verify the connection
 
 ```bash
-# Clone repository
-sudo mkdir -p /var/www
-cd /var/www
-sudo git clone https://github.com/021650641/recycling-management-system.git recycling
-sudo chown -R $USER:$USER recycling
-
-# Configure environment
-cd recycling/deployment
-./configure-env.sh
+PGPASSWORD='YOUR_SECURE_PASSWORD' psql -h localhost -U recycling_user -d recycling_db -c "SELECT version();"
 ```
 
-### 4. Build Backend
+### 3. Application Installation
+
+```bash
+# Create installation directory
+sudo mkdir -p /var/www/recycling
+sudo chown -R $USER:$USER /var/www/recycling
+
+# Clone repository
+git clone https://github.com/021650641/recycling-management-system.git /var/www/recycling
+
+# Navigate to installation
+cd /var/www/recycling
+```
+
+### 4. Backend Configuration
+
+#### Create the environment file
+
+```bash
+cat > /var/www/recycling/backend/.env << 'ENVEOF'
+# Server
+NODE_ENV=production
+PORT=5000
+API_PREFIX=/api/v1
+
+# Database (individual variables - NOT a DATABASE_URL)
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=recycling_db
+DB_USER=recycling_user
+DB_PASSWORD=YOUR_SECURE_PASSWORD
+DB_MAX_CONNECTIONS=20
+
+# Authentication
+JWT_SECRET=CHANGE_THIS_TO_A_RANDOM_64_CHAR_STRING
+JWT_EXPIRES_IN=7d
+JWT_REFRESH_EXPIRES_IN=30d
+
+# CORS (must match your domain exactly)
+CORS_ORIGIN=https://yourdomain.com
+
+# Logging
+LOG_LEVEL=info
+
+# File uploads
+MAX_FILE_SIZE=10485760
+
+# Rate limiting
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+
+# Email (optional - configure for confirmation emails)
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM=
+
+# Encryption key for sensitive data (optional)
+ENCRYPTION_KEY=
+ENVEOF
+```
+
+**Important:** Generate a secure JWT secret:
+
+```bash
+openssl rand -base64 48
+```
+
+Replace `CHANGE_THIS_TO_A_RANDOM_64_CHAR_STRING` with the output.
+
+#### Build the backend
 
 ```bash
 cd /var/www/recycling/backend
 
-# Install dependencies
-npm install
+# Install all dependencies (including dev dependencies for TypeScript compilation)
+npm ci
 
-# Build TypeScript
-npm run build
+# Compile TypeScript to JavaScript
+npx tsc
 
-# Run migrations
-npm run migrate
+# Verify the build
+ls dist/server.js  # Should exist
 ```
 
-### 5. Build Frontend
+> **Note:** The build step requires dev dependencies (TypeScript compiler). The compiled output in `dist/` is what runs in production.
+
+#### Create required directories
+
+```bash
+mkdir -p /var/www/recycling/backend/uploads
+mkdir -p /var/www/recycling/backend/logs
+```
+
+### 5. Frontend Configuration
 
 ```bash
 cd /var/www/recycling/frontend
 
-# Install dependencies
-npm install
+# Create frontend environment
+cat > .env << 'ENVEOF'
+VITE_API_URL=https://yourdomain.com/api
+ENVEOF
 
-# Build for production
-npm run build
+# Install dependencies
+npm ci
+
+# Build the production bundle
+npx vite build
+
+# Verify the build
+ls dist/index.html  # Should exist
+ls -lh dist/assets/*.css  # CSS should be ~15-25 KB (not a few hundred bytes)
 ```
 
-### 6. Configure Nginx
+### 6. Database Initialization
+
+Run all SQL migrations in order:
 
 ```bash
-# Copy nginx configuration
-sudo cp /var/www/recycling/deployment/nginx.conf.template /etc/nginx/sites-available/recycling-app
+cd /var/www/recycling/backend
 
-# Edit with your domain
-sudo nano /etc/nginx/sites-available/recycling-app
+# Option A: Use the migration runner (recommended)
+chmod +x migrations/run-migrations.sh
+./migrations/run-migrations.sh
 
-# Enable site
-sudo ln -s /etc/nginx/sites-available/recycling-app /etc/nginx/sites-enabled/
-sudo rm /etc/nginx/sites-enabled/default
-
-# Test and restart
-sudo nginx -t
-sudo systemctl restart nginx
+# Option B: Run migrations manually
+sudo -u postgres psql -d recycling_db -f migrations/001_initial_schema.sql
+sudo -u postgres psql -d recycling_db -f migrations/002_triggers_and_functions.sql
+sudo -u postgres psql -d recycling_db -f migrations/003_views_and_reports.sql
+sudo -u postgres psql -d recycling_db -f migrations/004_seed.sql
+sudo -u postgres psql -d recycling_db -f migrations/005_apartment_units.sql
+sudo -u postgres psql -d recycling_db -f migrations/006_fix_transaction_constraints.sql
+sudo -u postgres psql -d recycling_db -f migrations/007_price_time_validity.sql
+sudo -u postgres psql -d recycling_db -f migrations/008_add_encryption.sql
+sudo -u postgres psql -d recycling_db -f migrations/009_delivery_details.sql
 ```
 
-### 7. Install and Start Backend with systemd
+If running migrations manually with `sudo -u postgres`, grant permissions to the app user afterward:
+
+```bash
+sudo -u postgres psql -d recycling_db -c "
+  GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO recycling_user;
+  GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO recycling_user;
+"
+```
+
+The migration runner (`run-migrations.sh`) handles this automatically.
+
+#### Seed initial data
+
+Migration 004 seeds the database with:
+- Default cooperative organization
+- Default locations
+- Material categories (Plastic, Cardboard, Glass, Metal, Paper, Organic, E-Waste)
+- Default admin user
+
+### 7. systemd Service Setup
 
 ```bash
 # Copy the service file
 sudo cp /var/www/recycling/deployment/recycling-api.service /etc/systemd/system/
 
-# Edit the service file to match your paths and user
+# Edit to match your user and paths
 sudo nano /etc/systemd/system/recycling-api.service
+```
+
+Key fields to verify/update in the service file:
+
+| Field              | Default Value                            | Change To                    |
+|--------------------|------------------------------------------|------------------------------|
+| `User`             | `deploy`                                 | Your Linux username          |
+| `Group`            | `deploy`                                 | Your Linux group             |
+| `WorkingDirectory` | `/var/www/recycling/backend`             | Your installation path       |
+| `EnvironmentFile`  | `/var/www/recycling/backend/.env`        | Your .env path               |
+
+Also update the `ExecStartPre` lines to reference the correct paths and user.
+
+```bash
+# Optionally install the systemd target for grouped service management
+sudo cp /var/www/recycling/deployment/recycling.target /etc/systemd/system/
 
 # Reload systemd, enable and start the service
 sudo systemctl daemon-reload
@@ -189,432 +396,556 @@ sudo systemctl enable recycling-api.service
 sudo systemctl start recycling-api.service
 
 # Verify it's running
-sudo systemctl status recycling-api
+sudo systemctl status recycling-api.service
+
+# Test the health endpoint
+curl http://localhost:5000/health
 ```
 
-### 8. Configure SSL
+Expected health response:
+
+```json
+{"status":"healthy","timestamp":"...","uptime":5.123,"database":"connected"}
+```
+
+### 8. Nginx Configuration
 
 ```bash
-sudo certbot --nginx -d yourdomain.com
+# Copy the template
+sudo cp /var/www/recycling/deployment/nginx.conf.template \
+        /etc/nginx/sites-available/recycling
+
+# Replace placeholders with actual values
+sudo sed -i 's|{{DOMAIN_NAME}}|yourdomain.com|g' /etc/nginx/sites-available/recycling
+sudo sed -i 's|{{INSTALL_DIR}}|/var/www/recycling|g' /etc/nginx/sites-available/recycling
+sudo sed -i 's|{{API_PORT}}|5000|g' /etc/nginx/sites-available/recycling
+
+# Enable the site
+sudo ln -sf /etc/nginx/sites-available/recycling /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# Test and reload
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
-### 9. Configure Firewall
+### 9. SSL Certificate
 
 ```bash
-sudo ufw allow 22/tcp
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw enable
+# Install SSL with Let's Encrypt (requires domain pointed at this server)
+sudo certbot --nginx -d yourdomain.com --non-interactive --agree-tos --email you@email.com --redirect
+
+# Enable auto-renewal
+sudo systemctl enable certbot.timer
+sudo systemctl start certbot.timer
+
+# Verify auto-renewal works
+sudo certbot renew --dry-run
 ```
 
-## Configuration
-
-### Environment Variables
-
-**Backend** (`backend/.env`):
-```env
-NODE_ENV=production
-PORT=5000
-API_PREFIX=/api/v1
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=recycling_db
-DB_USER=recycling_user
-DB_PASSWORD=your_password
-DB_MAX_CONNECTIONS=20
-JWT_SECRET=your_secret_here
-JWT_EXPIRES_IN=7d
-JWT_REFRESH_EXPIRES_IN=30d
-CORS_ORIGIN=https://yourdomain.com
-```
-
-**Frontend** (`frontend/.env`):
-```env
-VITE_API_URL=https://yourdomain.com/api
-VITE_ENV=production
-```
-
-### Database Connection
-
-Test connection:
-```bash
-PGPASSWORD=your_password psql -h localhost -U recycling_user -d recycling_db
-```
-
-### systemd Service Configuration
-
-The `recycling-api.service` unit file is installed to `/etc/systemd/system/` and provides:
-- Automatic restart on failure (5-second delay)
-- Memory limit (512MB)
-- Security hardening (NoNewPrivileges, ProtectSystem, PrivateTmp)
-- Dependency ordering (starts after PostgreSQL)
-- Logging via journald
-
-View the service configuration:
-```bash
-sudo systemctl cat recycling-api
-```
-
-## Maintenance
-
-### Management Scripts
-
-All scripts are in `/var/www/recycling/deployment/`:
-
-#### Update Application
+### 10. Firewall
 
 ```bash
+sudo ufw allow 22/tcp      # SSH
+sudo ufw allow 80/tcp      # HTTP (redirects to HTTPS)
+sudo ufw allow 443/tcp     # HTTPS
+sudo ufw --force enable
+sudo ufw status
+```
+
+---
+
+## Post-Installation Verification
+
+Run through this checklist after installation:
+
+```bash
+# 1. All services running
+sudo systemctl status postgresql      # Active
+sudo systemctl status recycling-api   # Active
+sudo systemctl status nginx           # Active
+
+# 2. Health check
+curl -s https://yourdomain.com/health | python3 -m json.tool
+
+# 3. API accessible
+curl -s https://yourdomain.com/api/v1/auth/login \
+  -X POST -H "Content-Type: application/json" \
+  -d '{"email":"admin@recycling.coop","password":"admin123"}'
+
+# 4. Frontend loads
+curl -s -o /dev/null -w "%{http_code}" https://yourdomain.com/
+# Should return 200
+
+# 5. CSS compiled correctly (should be 15+ KB, not a few hundred bytes)
+ls -lh /var/www/recycling/frontend/dist/assets/*.css
+```
+
+### Default Login Credentials
+
+| Role     | Email                      | Password    |
+|----------|----------------------------|-------------|
+| Admin    | admin@recycling.coop       | admin123    |
+| Manager  | manager@recycling.coop     | manager123  |
+| Operator | operator@recycling.coop    | operator123 |
+
+**Change these passwords immediately after first login.**
+
+---
+
+## Environment Variables Reference
+
+### Backend (`backend/.env`)
+
+| Variable                  | Required | Default               | Description                           |
+|---------------------------|----------|-----------------------|---------------------------------------|
+| `NODE_ENV`                | Yes      | `development`         | `production` for deployed instances   |
+| `PORT`                    | Yes      | `3001`                | API server port (use `5000` in prod)  |
+| `API_PREFIX`              | No       | `/api/v1`             | API URL prefix                        |
+| `DB_HOST`                 | Yes      | `localhost`           | PostgreSQL host                       |
+| `DB_PORT`                 | Yes      | `5432`                | PostgreSQL port                       |
+| `DB_NAME`                 | Yes      | `recycling_db`        | Database name                         |
+| `DB_USER`                 | Yes      | `recycling_user`      | Database user                         |
+| `DB_PASSWORD`             | Yes      | (empty)               | Database password                     |
+| `DB_MAX_CONNECTIONS`      | No       | `20`                  | Connection pool size                  |
+| `JWT_SECRET`              | Yes      | (insecure default)    | Min 32 chars, use `openssl rand -base64 48` |
+| `JWT_EXPIRES_IN`          | No       | `7d`                  | Token expiry (e.g., `7d`, `24h`)     |
+| `JWT_REFRESH_EXPIRES_IN`  | No       | `30d`                 | Refresh token expiry                  |
+| `CORS_ORIGIN`             | Yes      | `http://localhost:3000` | Frontend URL (exact match)           |
+| `LOG_LEVEL`               | No       | `info`                | `error`, `warn`, `info`, or `debug`  |
+| `MAX_FILE_SIZE`           | No       | `10485760`            | Max upload size in bytes (10 MB)      |
+| `RATE_LIMIT_WINDOW_MS`    | No       | `900000`              | Rate limit window (15 min)            |
+| `RATE_LIMIT_MAX_REQUESTS` | No       | `100`                 | Max requests per window               |
+| `SMTP_HOST`               | No       | (empty)               | SMTP server for emails                |
+| `SMTP_PORT`               | No       | `587`                 | SMTP port                             |
+| `SMTP_USER`               | No       | (empty)               | SMTP username                         |
+| `SMTP_PASSWORD`           | No       | (empty)               | SMTP password                         |
+| `SMTP_FROM`               | No       | (empty)               | Sender email address                  |
+| `ENCRYPTION_KEY`          | No       | (empty)               | Base64 encryption key for sensitive data |
+
+> **Important:** The backend reads individual `DB_*` variables, not a `DATABASE_URL` connection string.
+
+### Frontend (`frontend/.env`)
+
+| Variable        | Required | Default                         | Description              |
+|-----------------|----------|---------------------------------|--------------------------|
+| `VITE_API_URL`  | Yes      | `http://localhost:3001/api/v1`  | Backend API base URL     |
+
+In production, set to `https://yourdomain.com/api` (Nginx proxies `/api` to the backend).
+
+---
+
+## Maintenance and Operations
+
+### Updating the Application
+
+#### Option A: Automated update
+
+```bash
+cd /var/www/recycling/deployment
 ./update.sh
 ```
 
-Options:
-- `--skip-backup` - Skip automatic backup
-- `--force` - Force update with local changes
+This script:
+1. Creates a backup (unless `--skip-backup`)
+2. Pulls latest code from `origin/main`
+3. Rebuilds backend (npm install + TypeScript compile)
+4. Rebuilds frontend (npm install + Vite build)
+5. Runs pending database migrations
+6. Restarts the systemd service
+7. Verifies the health check
 
-#### Backup
-
-```bash
-./backup.sh
-```
-
-Options:
-- `--db-only` - Backup database only
-- `--files-only` - Backup files only
-- `--retention 30` - Keep backups for 30 days
-- `--output /path` - Custom backup directory
-
-#### Reconfigure Environment
+#### Option B: Manual update
 
 ```bash
-./configure-env.sh
+cd /var/www/recycling
+
+# Pull latest code
+git pull origin main
+
+# Rebuild backend
+cd backend
+npm ci
+npx tsc
+
+# Run migrations
+chmod +x migrations/run-migrations.sh
+./migrations/run-migrations.sh
+
+# Rebuild frontend
+cd ../frontend
+npm ci
+npx vite build
+
+# Restart service
+sudo systemctl restart recycling-api.service
+
+# Verify
+curl http://localhost:5000/health
 ```
 
-### Daily Operations
+### Database Migrations
 
-**View logs:**
+The project includes a migration runner at `backend/migrations/run-migrations.sh` that:
+
+- Reads database credentials from `backend/.env`
+- Falls back to `sudo -u postgres` peer auth if no password is set
+- Creates a `schema_migrations` tracking table
+- Applies only unapplied migrations in numeric order (001, 002, ..., 009)
+- Grants table permissions to the app user when run as postgres superuser
+
+**Run migrations:**
+
+```bash
+cd /var/www/recycling/backend
+./migrations/run-migrations.sh
+```
+
+**Check which migrations have been applied:**
+
+```bash
+sudo -u postgres psql -d recycling_db -c "SELECT * FROM schema_migrations ORDER BY applied_at;"
+```
+
+### Backups
+
+#### Create a backup
+
+```bash
+cd /var/www/recycling/deployment
+./backup.sh                    # Full backup (database + files)
+./backup.sh --db-only          # Database only
+./backup.sh --files-only       # Application files only
+./backup.sh --retention 30     # Keep backups for 30 days
+./backup.sh --output /mnt/ext  # Custom backup directory
+```
+
+Backups are stored in `~/backups/recycling/` by default and include:
+- Compressed database dump (`db_YYYYMMDD_HHMMSS.sql.gz`)
+- Schema-only dump for reference (`schema_YYYYMMDD_HHMMSS.sql`)
+- Application files (`app_YYYYMMDD_HHMMSS.tar.gz`)
+- Optionally encrypted `.env` files
+- Manifest file with restoration instructions
+
+#### Restore from backup
+
+```bash
+# Restore database
+gunzip -c ~/backups/recycling/db_20260212_020000.sql.gz | sudo -u postgres psql recycling_db
+
+# Restore application files
+tar -xzf ~/backups/recycling/app_20260212_020000.tar.gz -C /var/www/
+```
+
+#### Schedule automatic backups
+
+```bash
+# Add to crontab - daily at 2:00 AM
+crontab -e
+# Add this line:
+0 2 * * * /var/www/recycling/deployment/backup.sh --db-only >> /var/log/recycling-backup.log 2>&1
+```
+
+### Log Management
+
+**View live backend logs:**
+
 ```bash
 sudo journalctl -u recycling-api -f
 ```
 
-**View recent logs:**
+**View last 100 lines:**
+
 ```bash
 sudo journalctl -u recycling-api --no-pager -n 100
 ```
 
-**Restart backend:**
-```bash
-sudo systemctl restart recycling-api
-```
-
-**Check status:**
-```bash
-sudo systemctl status recycling-api
-sudo systemctl status nginx
-sudo systemctl status postgresql
-```
-
-### Automated Backups
-
-Backups run daily at 2:00 AM (configured in cron):
+**View logs from a specific time range:**
 
 ```bash
-# View backup schedule
-crontab -l
-
-# Manual backup
-/var/www/recycling/deployment/backup.sh
-
-# View recent backups
-ls -lh ~/backups/recycling/
+sudo journalctl -u recycling-api --since "2026-02-12 08:00" --until "2026-02-12 12:00"
 ```
 
-### Database Maintenance
+**Nginx logs:**
 
-**Vacuum database:**
 ```bash
-sudo -u postgres psql recycling_db -c "VACUUM ANALYZE;"
+sudo tail -f /var/log/nginx/access.log
+sudo tail -f /var/log/nginx/error.log
 ```
 
-**Check database size:**
-```bash
-sudo -u postgres psql -c "SELECT pg_size_pretty(pg_database_size('recycling_db'));"
-```
+**Application-level logs** are written to `backend/logs/` via Winston.
 
-**Backup database manually:**
-```bash
-sudo -u postgres pg_dump recycling_db | gzip > backup_$(date +%Y%m%d).sql.gz
-```
-
-**Restore database:**
-```bash
-gunzip -c backup.sql.gz | sudo -u postgres psql recycling_db
-```
+---
 
 ## Troubleshooting
 
-### Backend Not Starting
+### Backend service won't start
 
 ```bash
-# Check service status and logs
-sudo systemctl status recycling-api
+# Check service logs
 sudo journalctl -u recycling-api --no-pager -n 50
 
-# Check if port is in use
+# Common causes:
+# 1. Port already in use
 sudo lsof -i :5000
 
-# Restart
+# 2. Missing .env file
+ls -la /var/www/recycling/backend/.env
+
+# 3. TypeScript not compiled
+ls /var/www/recycling/backend/dist/server.js
+
+# 4. Database not reachable
+PGPASSWORD=yourpass psql -h localhost -U recycling_user -d recycling_db -c "SELECT 1;"
+```
+
+### 502 Bad Gateway from Nginx
+
+The backend is not responding. Check:
+
+```bash
+# Is the service running?
+sudo systemctl status recycling-api
+
+# Is it listening on the configured port?
+curl http://localhost:5000/health
+
+# Restart if needed
 sudo systemctl restart recycling-api
 ```
 
-### Database Connection Failed
+### Database permission errors (500 on specific endpoints)
+
+If migrations were run via `sudo -u postgres`, the app user may lack permissions on the new tables:
 
 ```bash
-# Check PostgreSQL status
-sudo systemctl status postgresql
-
-# Check database exists
-sudo -u postgres psql -l | grep recycling
-
-# Test connection
-PGPASSWORD=your_pass psql -h localhost -U recycling_user -d recycling_db
+sudo -u postgres psql -d recycling_db -c "
+  GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO recycling_user;
+  GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO recycling_user;
+"
+sudo systemctl restart recycling-api
 ```
 
-### Nginx Errors
+### Frontend loads but has no styling
+
+The Tailwind CSS build may have failed:
 
 ```bash
-# Check configuration
-sudo nginx -t
-
-# View error logs
-sudo tail -f /var/log/nginx/error.log
-
-# Restart Nginx
-sudo systemctl restart nginx
+cd /var/www/recycling/frontend
+ls -lh dist/assets/*.css
+# If CSS file is < 1 KB, rebuild:
+npm ci
+npx vite build
 ```
 
-### SSL Certificate Issues
+### SSL certificate issues
 
 ```bash
 # Check certificate status
 sudo certbot certificates
 
-# Renew certificate manually
-sudo certbot renew --dry-run
+# Manual renewal
+sudo certbot renew
 
-# Check auto-renewal timer
+# Verify auto-renewal timer
 sudo systemctl status certbot.timer
 ```
 
-### High Memory Usage
+### Connection refused on port 5432
+
+PostgreSQL may not be running or not accepting connections:
 
 ```bash
-# Check service resource usage
-systemctl status recycling-api
-sudo journalctl -u recycling-api --no-pager -n 20
-
-# Restart the service (systemd enforces MemoryMax=512M)
-sudo systemctl restart recycling-api
-```
-
-### Frontend Not Loading
-
-```bash
-# Check if files exist
-ls -lh /var/www/recycling/frontend/dist/
-
-# Rebuild frontend
-cd /var/www/recycling/frontend
-npm run build
-
-# Check Nginx config
-sudo nginx -t
-
-# Reload Nginx
-sudo systemctl reload nginx
-```
-
-### Slow Performance
-
-```bash
-# Check system resources
-htop
-
-# Check PostgreSQL performance
-sudo -u postgres psql recycling_db -c "
-SELECT schemaname, tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename))
-FROM pg_tables
-WHERE schemaname = 'public'
-ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
-"
-
-# Restart services
-sudo systemctl restart recycling-api
-sudo systemctl restart postgresql
-```
-
-## Security
-
-### Best Practices
-
-1. **Change default admin password immediately** after first login
-2. **Keep system updated:**
-   ```bash
-   sudo apt update && sudo apt upgrade -y
-   ```
-
-3. **Enable automatic security updates:**
-   ```bash
-   sudo apt install unattended-upgrades
-   sudo dpkg-reconfigure --priority=low unattended-upgrades
-   ```
-
-4. **Rotate JWT secret periodically:**
-   ```bash
-   cd /var/www/recycling/deployment
-   ./configure-env.sh
-   ```
-
-5. **Monitor logs regularly:**
-   ```bash
-   sudo journalctl -u recycling-api -f
-   sudo tail -f /var/log/nginx/access.log
-   ```
-
-### Firewall Configuration
-
-```bash
-# Check firewall status
-sudo ufw status
-
-# Allow specific IP only (optional)
-sudo ufw allow from YOUR_IP to any port 22
-
-# Block all other SSH
-sudo ufw deny 22/tcp
-```
-
-### SSL Certificate Renewal
-
-Auto-renewal is configured. To test:
-
-```bash
-sudo certbot renew --dry-run
-```
-
-Check renewal timer:
-```bash
-sudo systemctl status certbot.timer
-```
-
-### Database Security
-
-```bash
-# Restrict PostgreSQL to localhost
-sudo nano /etc/postgresql/*/main/postgresql.conf
-# Set: listen_addresses = 'localhost'
-
-# Restart PostgreSQL
-sudo systemctl restart postgresql
-```
-
-### Backup Encryption
-
-Encrypt sensitive backups:
-
-```bash
-./backup.sh
-# Enter encryption password when prompted
-```
-
-Decrypt:
-```bash
-gpg --decrypt backup_file.tar.gz.gpg | tar -xz
-```
-
-## Monitoring
-
-### Health Checks
-
-**API Health:**
-```bash
-curl https://yourdomain.com/health
-```
-
-**Service Status:**
-```bash
-sudo systemctl status recycling-api
-sudo systemctl status nginx
 sudo systemctl status postgresql
+sudo systemctl restart postgresql
+
+# Check pg_hba.conf allows local connections
+sudo cat /etc/postgresql/*/main/pg_hba.conf | grep -v "^#" | grep -v "^$"
 ```
 
-**System Resources:**
-```bash
-free -h
-df -h
-top
-```
+---
 
-### Log Locations
+## Rollback Procedures
 
-- **Application Logs:** `sudo journalctl -u recycling-api`
-- **Nginx Access:** `/var/log/nginx/access.log`
-- **Nginx Error:** `/var/log/nginx/error.log`
-- **PostgreSQL:** `/var/log/postgresql/`
-
-### Performance Monitoring
+### Rollback to previous code version
 
 ```bash
-# systemd resource tracking
-systemd-cgtop
+cd /var/www/recycling
 
-# PostgreSQL active queries
-sudo -u postgres psql recycling_db -c "
-SELECT pid, age(clock_timestamp(), query_start), usename, query
-FROM pg_stat_activity
-WHERE query != '<IDLE>' AND query NOT ILIKE '%pg_stat_activity%'
-ORDER BY query_start DESC;
-"
-```
+# See recent commits
+git log --oneline -10
 
-## Default Credentials
+# Roll back one commit
+git revert HEAD
 
-After deployment, login with:
+# Or reset to a specific commit
+git checkout <commit-hash> -- .
 
-- **Email:** admin@recycling.coop
-- **Password:** admin123
-
-**IMPORTANT:** Change these immediately after first login!
-
-## Useful Commands
-
-```bash
-# View service status
-sudo systemctl status recycling-api
-
-# View logs
-sudo journalctl -u recycling-api -f
-
-# Restart backend
+# Rebuild
+cd backend && npm ci && npx tsc
+cd ../frontend && npm ci && npx vite build
 sudo systemctl restart recycling-api
-
-# Update application
-/var/www/recycling/deployment/update.sh
-
-# Create backup
-/var/www/recycling/deployment/backup.sh
-
-# Restart everything
-sudo systemctl restart recycling-api
-sudo systemctl restart nginx
 ```
 
-## Support
+### Rollback database migration
 
-For issues or questions:
+Database migrations use `IF NOT EXISTS` / `IF EXISTS` guards and are additive. To roll back, manually reverse the changes:
 
-- **Repository:** https://github.com/021650641/recycling-management-system
-- **Issues:** https://github.com/021650641/recycling-management-system/issues
+```bash
+# Example: remove delivery columns added by migration 009
+sudo -u postgres psql -d recycling_db <<'SQL'
+ALTER TABLE sale DROP COLUMN IF EXISTS delivery_person_id;
+ALTER TABLE sale DROP COLUMN IF EXISTS delivery_vehicle_id;
+ALTER TABLE sale DROP COLUMN IF EXISTS delivery_notes;
+DROP TABLE IF EXISTS delivery_vehicle;
+DROP TABLE IF EXISTS delivery_person;
+DELETE FROM schema_migrations WHERE filename = '009_delivery_details.sql';
+SQL
+```
 
-## License
+### Full rollback from backup
 
-See LICENSE file in repository.
+```bash
+# Stop services
+sudo systemctl stop recycling-api
+
+# Restore database
+gunzip -c ~/backups/recycling/db_YYYYMMDD_HHMMSS.sql.gz | sudo -u postgres psql recycling_db
+
+# Restore files
+tar -xzf ~/backups/recycling/app_YYYYMMDD_HHMMSS.tar.gz -C /var/www/
+
+# Rebuild and restart
+cd /var/www/recycling/backend && npm ci && npx tsc
+sudo systemctl start recycling-api
+```
+
+---
+
+## Security Hardening
+
+### Immediate post-installation
+
+1. **Change default admin password** - Login and change via the profile menu
+2. **Set a strong JWT secret** - At least 48 random bytes
+3. **Restrict CORS origin** - Set `CORS_ORIGIN` to your exact domain
+4. **Disable SSH password auth** - Use SSH keys only
+
+### systemd security features (already configured)
+
+The `recycling-api.service` includes:
+
+- `NoNewPrivileges=true` - Prevents privilege escalation
+- `ProtectSystem=full` - Read-only access to `/usr`, `/boot`, `/etc`
+- `ProtectHome=true` - No access to home directories
+- `PrivateTmp=true` - Isolated temporary directory
+- `MemoryMax=512M` - Memory limit prevents runaway processes
+- `TasksMax=256` - Limits spawned processes
+
+### PostgreSQL
+
+```bash
+# Ensure PostgreSQL only listens on localhost
+sudo grep listen_addresses /etc/postgresql/*/main/postgresql.conf
+# Should show: listen_addresses = 'localhost'
+```
+
+### Automatic security updates
+
+```bash
+sudo apt install unattended-upgrades
+sudo dpkg-reconfigure --priority=low unattended-upgrades
+```
+
+### Rotate JWT secret
+
+When rotating the JWT secret, all existing user sessions are invalidated:
+
+```bash
+# Generate new secret
+NEW_SECRET=$(openssl rand -base64 48)
+
+# Update .env
+sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$NEW_SECRET/" /var/www/recycling/backend/.env
+
+# Restart service
+sudo systemctl restart recycling-api
+```
+
+---
+
+## Multi-VM / Scaling Considerations
+
+The default deployment runs all services on a single VM. For higher availability or load:
+
+### Separate database server
+
+1. Install PostgreSQL on a dedicated VM
+2. Update `pg_hba.conf` to allow connections from the app server's IP
+3. Update `postgresql.conf`: `listen_addresses = '*'`
+4. In the backend `.env`, set `DB_HOST` to the database server's IP
+5. Ensure the firewall allows port 5432 only from the app server
+
+### Multiple application servers
+
+1. Deploy the backend on multiple VMs behind a load balancer
+2. All instances must share the same `JWT_SECRET` and point to the same database
+3. File uploads (`backend/uploads/`) should use shared storage (NFS or S3)
+4. Use a load balancer (e.g., Nginx, HAProxy, or cloud LB) for traffic distribution
+
+### Docker deployment (alternative)
+
+A `docker-compose.yml` is provided for containerized deployments:
+
+```bash
+cd /var/www/recycling
+docker compose up -d
+```
+
+This starts PostgreSQL, backend, and frontend containers with an Nginx reverse proxy.
+
+---
+
+## Deployment Scripts Reference
+
+| Script              | Purpose                                        | Usage                              |
+|---------------------|------------------------------------------------|------------------------------------|
+| `deploy.sh`         | Full automated first-time deployment           | `./deploy.sh`                      |
+| `update.sh`         | Pull updates, rebuild, restart services        | `./update.sh [--skip-backup] [--force]` |
+| `backup.sh`         | Database and file backups with rotation        | `./backup.sh [--db-only] [--retention N]` |
+| `configure-env.sh`  | Interactive .env file creation                 | `./configure-env.sh`               |
+| `init-database.sh`  | PostgreSQL database and user setup             | `./init-database.sh`               |
+| `run-migrations.sh` | Apply pending SQL migrations (in `backend/migrations/`) | `./migrations/run-migrations.sh` |
+
+---
+
+## File Layout on a Deployed Server
+
+```
+/var/www/recycling/                    # Installation root
+|-- backend/
+|   |-- .env                           # Backend environment (secrets)
+|   |-- dist/                          # Compiled JavaScript (production)
+|   |   +-- server.js                  # Entry point
+|   |-- migrations/                    # SQL migration files
+|   |   +-- run-migrations.sh          # Migration runner
+|   |-- node_modules/                  # Dependencies
+|   |-- uploads/                       # User uploads
+|   +-- logs/                          # Application logs
+|-- frontend/
+|   |-- .env                           # Frontend environment
+|   +-- dist/                          # Built static files (served by Nginx)
+|       |-- index.html
+|       +-- assets/
+|-- deployment/                        # Deployment scripts
++-- .git/                              # Git repository
+
+/etc/systemd/system/
+|-- recycling-api.service              # Backend service unit
++-- recycling.target                   # Service group target
+
+/etc/nginx/sites-available/
++-- recycling                          # Nginx site config
+
+~/backups/recycling/                   # Backup storage
+```

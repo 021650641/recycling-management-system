@@ -1,136 +1,129 @@
-# Recycling Management System
+# CIVICycle - Recycling Management System
 
-A comprehensive multi-user recycling management system with offline support, real-time tracking, and advanced reporting.
+A comprehensive multi-user recycling management and traceability platform with offline support, real-time inventory tracking, delivery logistics, and advanced reporting.
 
 ## Features
 
-- **Multi-Location Support**: Manage multiple recycling stations
-- **Complete Traceability**: Track material from apartment → waste picker → location → client
-- **Offline Operation**: Full offline capability with automatic sync
-- **Real-time Inventory**: Automatic inventory updates and stock tracking
-- **Advanced Reporting**: Instant analytics on volumes, sources, and financials
-- **Role-Based Access**: Admin, Manager, Operator, and Viewer roles
-- **Daily Pricing**: Set and override prices per location
-- **Payment Tracking**: Full payment lifecycle management
+- **Multi-Location Support** - Manage multiple recycling stations under one cooperative
+- **Complete Traceability** - Track material from apartment source through waste picker collection to client sale and delivery
+- **Offline-First PWA** - Full offline capability with background sync via IndexedDB
+- **Real-time Inventory** - Automatic stock updates via database triggers
+- **Delivery Logistics** - Track vehicles, drivers, and delivery confirmations with reusable records
+- **Configurable Email Confirmations** - Templated emails for purchases, sales, and deliveries
+- **Advanced Reporting** - Analytics with PDF and Excel export, scheduled report generation
+- **Role-Based Access Control** - Admin, Manager, Operator, and Viewer roles
+- **Daily Pricing** - Per-location, time-of-day material pricing
+- **Payment Tracking** - Full payment lifecycle with voiding/reversal support
+- **Bilingual** - English and Spanish interface
 
 ## Tech Stack
 
-- **Backend**: Node.js, Express, TypeScript, PostgreSQL
-- **Frontend**: React, TypeScript, Vite, TanStack Query
-- **Database**: PostgreSQL 14+ with partitioning and materialized views
-- **Offline**: IndexedDB with bidirectional sync
-- **Auth**: JWT tokens with refresh
-- **Deployment**: Docker, Docker Compose, systemd
+- **Backend**: Node.js 20, Express 4, TypeScript, PostgreSQL 14+
+- **Frontend**: React 18, Vite 6, TypeScript, Tailwind CSS 3, Zustand
+- **Offline**: Dexie (IndexedDB) with bidirectional sync
+- **Auth**: JWT tokens with bcrypt password hashing
+- **Infrastructure**: systemd, Nginx, Let's Encrypt SSL
+- **Alternative**: Docker Compose for containerized deployments
 
 ## Quick Start
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+ (LTS)
 - PostgreSQL 14+
-- Docker (optional)
+- Git
 
-### Using Docker (Recommended)
-
-```bash
-# Clone and navigate to project
-cd recycling-app
-
-# Start all services
-npm run docker:up
-
-# The application will be available at:
-# - Frontend: http://localhost:3000
-# - Backend API: http://localhost:5000
-```
-
-### Manual Setup
+### Development Setup
 
 ```bash
-# Install dependencies
-npm run install:all
+# Clone the repository
+git clone https://github.com/021650641/recycling-management-system.git
+cd recycling-management-system
 
-# Set up environment variables
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-
-# Edit backend/.env with your database credentials
+# Backend setup
+cd backend
+cp env.example .env              # Configure database credentials
+npm install
+npx tsc                          # Compile TypeScript
 
 # Run database migrations
-npm run db:migrate
+chmod +x migrations/run-migrations.sh
+./migrations/run-migrations.sh
 
-# Seed initial data
-npm run db:seed
+# Start backend (development)
+npm run dev                      # Runs on http://localhost:3001
 
-# Start development servers
-npm run dev
+# Frontend setup (in a separate terminal)
+cd ../frontend
+npm install
+npm run dev                      # Runs on http://localhost:3000
 ```
+
+### Docker Setup
+
+```bash
+docker compose up -d
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:5000
+```
+
+### Production Deployment
+
+See **[deployment/DEPLOYMENT.md](deployment/DEPLOYMENT.md)** for complete VPS installation guide.
 
 ## Project Structure
 
 ```
-recycling-app/
-├── backend/              # Node.js API server
-│   ├── src/
-│   │   ├── routes/      # API endpoints
-│   │   ├── controllers/ # Business logic
-│   │   ├── models/      # Database models
-│   │   ├── middleware/  # Auth, validation
-│   │   └── services/    # Sync, pricing logic
-│   ├── db/
-│   │   ├── migrations/  # Database schema
-│   │   └── seeds/       # Initial data
-│   └── package.json
-├── frontend/             # React application
-│   ├── src/
-│   │   ├── components/  # UI components
-│   │   ├── pages/       # Route pages
-│   │   ├── services/    # API calls, offline sync
-│   │   ├── hooks/       # Custom React hooks
-│   │   └── utils/       # Helpers
-│   └── package.json
-├── docker-compose.yml    # Docker configuration
-└── package.json          # Root workspace
+recycling-management-system/
+|-- backend/                    # Node.js + Express + TypeScript API
+|   |-- src/
+|   |   |-- routes/            # 16 API route modules
+|   |   |-- middleware/        # JWT auth and role-based access
+|   |   |-- services/         # Email, logging, scheduling
+|   |   |-- config.ts         # Environment configuration
+|   |   |-- db.ts             # PostgreSQL connection pool
+|   |   +-- server.ts         # Express app and startup
+|   |-- migrations/            # SQL schema migrations (001-009)
+|   +-- package.json
+|-- frontend/                   # React 18 + Vite SPA
+|   |-- src/
+|   |   |-- pages/            # 12 page components
+|   |   |-- components/       # Layout and shared UI
+|   |   |-- lib/              # API client, offline DB, sync
+|   |   |-- store/            # Zustand state (auth, settings)
+|   |   +-- i18n/             # English and Spanish translations
+|   +-- package.json
+|-- deployment/                 # Production deployment scripts
+|   |-- deploy.sh             # Automated first-time deployment
+|   |-- update.sh             # Pull updates and restart
+|   |-- backup.sh             # Database and file backups
+|   |-- recycling-api.service # systemd service unit
+|   +-- nginx.conf.template   # Nginx reverse proxy config
+|-- docker-compose.yml          # Container orchestration
+|-- TECHNICAL.md                # Technical architecture document
++-- DEPLOYMENT.md               # Quick deployment reference
 ```
 
 ## Default Credentials
 
-After seeding the database, you can log in with:
+After running migrations (which include seed data):
 
-- **Admin**: admin@recycling.coop / admin123
-- **Manager**: manager@recycling.coop / manager123
-- **Operator**: operator@recycling.coop / operator123
+| Role     | Email                      | Password    |
+|----------|----------------------------|-------------|
+| Admin    | admin@recycling.coop       | admin123    |
+| Manager  | manager@recycling.coop     | manager123  |
+| Operator | operator@recycling.coop    | operator123 |
 
-## API Documentation
+**Change these immediately in production.**
 
-Full API documentation is available at `http://localhost:5000/api/docs` when running the backend.
+## Documentation
 
-## Database Schema
-
-See `docs/recycling-management-system-spec.md` for complete database schema and architecture details.
-
-## Development
-
-```bash
-# Run backend only
-npm run dev:backend
-
-# Run frontend only
-npm run dev:frontend
-
-# Build for production
-npm run build
-
-# Run migrations
-npm run db:migrate
-
-# Seed database
-npm run db:seed
-```
-
-## Deployment
-
-See `docs/DEPLOYMENT.md` for detailed deployment instructions.
+| Document                                          | Description                              |
+|---------------------------------------------------|------------------------------------------|
+| [deployment/DEPLOYMENT.md](deployment/DEPLOYMENT.md) | Full installation and deployment guide |
+| [TECHNICAL.md](TECHNICAL.md)                      | Technical architecture and stack details |
+| [API.md](API.md)                                  | REST API endpoint documentation          |
+| [DEPLOYMENT.md](DEPLOYMENT.md)                    | Quick deployment reference               |
 
 ## License
 

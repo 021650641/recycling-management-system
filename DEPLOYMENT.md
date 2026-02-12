@@ -1,99 +1,67 @@
-# Production Deployment Checklist
+# Production Deployment Quick Reference
 
-## Prerequisites
-- Node.js 18+ installed
-- PostgreSQL 14+ running
-- systemd (standard on all modern Linux distributions)
-- Nginx configured
+For the full installation and deployment guide, see **[deployment/DEPLOYMENT.md](deployment/DEPLOYMENT.md)**.
 
-## Backend Deployment
+For the technical architecture document, see **[TECHNICAL.md](TECHNICAL.md)**.
 
-1. **Pull latest code**
-   ```bash
-   cd /var/www/recycling/backend
-   git pull origin main
-   ```
+---
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Build TypeScript**
-   ```bash
-   npm run build
-   ```
-
-4. **Restart service**
-   ```bash
-   sudo systemctl restart recycling-api
-   ```
-
-5. **Verify backend is running**
-   ```bash
-   sudo systemctl status recycling-api
-   curl https://your-domain.com/health -k
-   ```
-
-## Frontend Deployment
-
-1. **Pull latest code**
-   ```bash
-   cd /var/www/recycling/frontend
-   git pull origin main
-   ```
-
-2. **Install dependencies (includes autoprefixer upgrade)**
-   ```bash
-   npm install
-   ```
-
-3. **Build production bundle**
-   ```bash
-   npm run build
-   ```
-
-4. **Verify Tailwind CSS compiled (should be ~19KB, not 383 bytes)**
-   ```bash
-   ls -lh dist/assets/*.css
-   ```
-
-5. Deploy is automatic (nginx serves from dist/)
-
-## Post-Deployment Verification
-
-1. **Clear browser cache on first visit**
-   - Hard refresh: Ctrl+Shift+R
-   - Or clear IndexedDB: `indexedDB.deleteDatabase('recyclingDB')`
-
-2. **Test login flow**
-   - Login with admin credentials
-   - Verify JWT token stored
-   - Check dashboard loads with styling
-
-3. **Verify API endpoints**
-   ```bash
-   # Get auth token first, then:
-   curl "https://your-domain.com/api/v1/reports/summary?startDate=2026-01-01&endDate=2026-02-10" \
-     -H "Authorization: Bearer YOUR_TOKEN" -k
-   ```
-
-4. **Check for errors**
-   ```bash
-   # Backend logs
-   sudo journalctl -u recycling-api --no-pager -n 50
-
-   # Nginx logs
-   tail -50 /var/log/nginx/error.log
-   ```
-
-## Rollback Plan
-
-If deployment fails:
+## Quick Update Checklist
 
 ```bash
 cd /var/www/recycling
-git reset --hard HEAD~1
-cd backend && npm run build && sudo systemctl restart recycling-api
-cd ../frontend && npm run build
+
+# 1. Pull latest code
+git pull origin main
+
+# 2. Rebuild backend
+cd backend && npm ci && npx tsc
+
+# 3. Run pending database migrations
+./migrations/run-migrations.sh
+
+# 4. Rebuild frontend
+cd ../frontend && npm ci && npx vite build
+
+# 5. Restart backend service
+sudo systemctl restart recycling-api.service
+
+# 6. Verify
+curl http://localhost:5000/health
+```
+
+Or use the automated script:
+
+```bash
+cd /var/www/recycling/deployment
+./update.sh
+```
+
+## Post-Update Verification
+
+```bash
+# Service status
+sudo systemctl status recycling-api
+
+# Health check
+curl https://your-domain.com/health
+
+# Backend logs
+sudo journalctl -u recycling-api --no-pager -n 50
+
+# Nginx logs
+tail -50 /var/log/nginx/error.log
+
+# Frontend CSS check (should be 15+ KB)
+ls -lh /var/www/recycling/frontend/dist/assets/*.css
+```
+
+## Rollback
+
+```bash
+cd /var/www/recycling
+git revert HEAD
+cd backend && npm ci && npx tsc
+cd ../frontend && npm ci && npx vite build
+sudo systemctl restart recycling-api
 ```
