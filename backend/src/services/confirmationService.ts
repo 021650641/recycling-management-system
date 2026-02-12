@@ -13,6 +13,11 @@ interface ConfirmationSettings {
   purchaseBodyTemplate: string;
   saleSubjectTemplate: string;
   saleBodyTemplate: string;
+  deliveryEmailEnabled: boolean;
+  deliveryRecipientField: string; // 'client' or 'custom'
+  customDeliveryEmail: string;
+  deliverySubjectTemplate: string;
+  deliveryBodyTemplate: string;
 }
 
 const DEFAULT_PURCHASE_BODY_TEMPLATE = `
@@ -48,6 +53,19 @@ const DEFAULT_SALE_BODY_TEMPLATE = `
 </table>
 `;
 
+const defaultDeliverySubject = 'Delivery Confirmation {{sale_number}}';
+const defaultDeliveryBody = `<h2>Delivery Confirmation</h2>
+<p>Sale <strong>{{sale_number}}</strong> has been delivered.</p>
+<table style="border-collapse:collapse;width:100%">
+<tr><td style="padding:8px;border:1px solid #ddd"><strong>Client</strong></td><td style="padding:8px;border:1px solid #ddd">{{client_name}}</td></tr>
+<tr><td style="padding:8px;border:1px solid #ddd"><strong>Material</strong></td><td style="padding:8px;border:1px solid #ddd">{{material}}</td></tr>
+<tr><td style="padding:8px;border:1px solid #ddd"><strong>Weight</strong></td><td style="padding:8px;border:1px solid #ddd">{{weight_kg}} kg</td></tr>
+<tr><td style="padding:8px;border:1px solid #ddd"><strong>Total</strong></td><td style="padding:8px;border:1px solid #ddd">\${{total_amount}}</td></tr>
+<tr><td style="padding:8px;border:1px solid #ddd"><strong>Vehicle</strong></td><td style="padding:8px;border:1px solid #ddd">{{vehicle_type}} - {{registration_number}}</td></tr>
+<tr><td style="padding:8px;border:1px solid #ddd"><strong>Driver</strong></td><td style="padding:8px;border:1px solid #ddd">{{driver_name}} (ID: {{driver_id_card}})</td></tr>
+<tr><td style="padding:8px;border:1px solid #ddd"><strong>Location</strong></td><td style="padding:8px;border:1px solid #ddd">{{location}}</td></tr>
+</table>`;
+
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
@@ -65,6 +83,11 @@ async function getConfirmationSettings(): Promise<ConfirmationSettings> {
     purchaseBodyTemplate: '',
     saleSubjectTemplate: 'Sale Confirmation {{sale_number}}',
     saleBodyTemplate: '',
+    deliveryEmailEnabled: false,
+    deliveryRecipientField: 'client',
+    customDeliveryEmail: '',
+    deliverySubjectTemplate: 'Delivery Confirmation {{sale_number}}',
+    deliveryBodyTemplate: '',
   };
 
   try {
@@ -82,6 +105,11 @@ async function getConfirmationSettings(): Promise<ConfirmationSettings> {
       if (row.key === 'purchaseBodyTemplate') defaults.purchaseBodyTemplate = row.value;
       if (row.key === 'saleSubjectTemplate') defaults.saleSubjectTemplate = row.value;
       if (row.key === 'saleBodyTemplate') defaults.saleBodyTemplate = row.value;
+      if (row.key === 'deliveryEmailEnabled') defaults.deliveryEmailEnabled = row.value === 'true';
+      if (row.key === 'deliveryRecipientField') defaults.deliveryRecipientField = row.value;
+      if (row.key === 'customDeliveryEmail') defaults.customDeliveryEmail = row.value;
+      if (row.key === 'deliverySubjectTemplate') defaults.deliverySubjectTemplate = row.value;
+      if (row.key === 'deliveryBodyTemplate') defaults.deliveryBodyTemplate = row.value;
     }
   } catch {
     // Table may not exist yet
@@ -266,5 +294,82 @@ export async function sendSaleConfirmation(saleId: string): Promise<void> {
     logger.info(`Sale confirmation sent: ${sale.sale_number} -> ${recipient}`);
   } catch (error: any) {
     logger.error(`Sale confirmation failed: ${error.message}`);
+  }
+}
+
+export async function sendDeliveryConfirmation(saleId: string): Promise<void> {
+  try {
+    const settings = await getConfirmationSettings();
+    if (!settings.deliveryEmailEnabled) return;
+
+    const configured = await isEmailConfigured();
+    if (!configured) return;
+
+    const saleResult = await query(
+      `SELECT s.*, mc.name as material_name, l.name as location_name,
+              c.name as client_name, c.contact_email as client_email,
+              dp.full_name as driver_name, dp.id_card_number as driver_id_card,
+              dv.vehicle_type, dv.registration_number
+       FROM sale s
+       LEFT JOIN material_category mc ON s.material_category_id = mc.id
+       LEFT JOIN location l ON s.location_id = l.id
+       LEFT JOIN client c ON s.client_id = c.id
+       LEFT JOIN delivery_person dp ON s.delivery_person_id = dp.id
+       LEFT JOIN delivery_vehicle dv ON s.delivery_vehicle_id = dv.id
+       WHERE s.id = $1`,
+      [saleId]
+    );
+    if (saleResult.rows.length === 0) return;
+
+    const sale = saleResult.rows[0];
+
+    let recipient = '';
+    if (settings.deliveryRecipientField === 'client' && sale.client_email) {
+      recipient = sale.client_email;
+    } else if (settings.customDeliveryEmail) {
+      recipient = settings.customDeliveryEmail;
+    }
+    if (!recipient) return;
+
+    const saleDate = new Date(sale.sale_date || sale.created_at);
+    const params: Record<string, string> = {
+      ...getDateParams(saleDate),
+      sale_number: sale.sale_number || '',
+      client_name: sale.client_name || '-',
+      client_email: sale.client_email || '',
+      material: sale.material_name || '-',
+      location: sale.location_name || '-',
+      weight_kg: parseFloat(sale.weight_kg).toFixed(2),
+      unit_price: parseFloat(sale.unit_price).toFixed(2),
+      total_amount: parseFloat(sale.total_amount).toFixed(2),
+      payment_method: sale.payment_method || '-',
+      notes: sale.notes || '-',
+      vehicle_type: sale.vehicle_type || '-',
+      registration_number: sale.registration_number || '-',
+      driver_name: sale.driver_name || '-',
+      driver_id_card: sale.driver_id_card || '-',
+      delivery_notes: sale.delivery_notes || '-',
+    };
+
+    // Render subject – use the declared default if no custom template is configured
+    const subject = renderTemplate(
+      settings.deliverySubjectTemplate || defaultDeliverySubject,
+      params
+    );
+
+    // Render body - use custom template if set, otherwise the default
+    const bodyTemplate = settings.deliveryBodyTemplate || defaultDeliveryBody;
+    const renderedBody = renderTemplate(bodyTemplate, params);
+    const body = wrapInEmailHtml(renderedBody);
+
+    await sendReportEmail({
+      to: recipient,
+      subject: `CIVICycle - ${subject}`,
+      body,
+    });
+
+    logger.info(`Delivery confirmation sent: ${sale.sale_number} -> ${recipient}`);
+  } catch (error: any) {
+    logger.error(`Delivery confirmation failed: ${error.message}`);
   }
 }

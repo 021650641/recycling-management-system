@@ -2159,17 +2159,23 @@ function ConfirmationsTab() {
   const [saving, setSaving] = useState(false);
   const [showPurchaseParams, setShowPurchaseParams] = useState(false);
   const [showSaleParams, setShowSaleParams] = useState(false);
+  const [showDeliveryParams, setShowDeliveryParams] = useState(false);
   const [settings, setSettings] = useState({
     purchaseEmailEnabled: false,
     saleEmailEnabled: false,
+    deliveryEmailEnabled: false,
     purchaseRecipientField: 'vendor' as 'vendor' | 'custom',
     saleRecipientField: 'client' as 'client' | 'custom',
+    deliveryRecipientField: 'client' as 'client' | 'custom',
     customPurchaseEmail: '',
     customSaleEmail: '',
+    customDeliveryEmail: '',
     purchaseSubjectTemplate: 'CIVICycle - Purchase Confirmation {{transaction_number}}',
     purchaseBodyTemplate: '<h2>Purchase Confirmation</h2>\n<p>Transaction {{transaction_number}} for {{weight_kg}} kg of {{material}} has been recorded on {{date}}.</p>\n<p>Vendor: {{vendor_name}}</p>\n<p>Location: {{location}}</p>\n<p>Total: ${{total_cost}}</p>',
     saleSubjectTemplate: 'CIVICycle - Sale Confirmation {{sale_number}}',
     saleBodyTemplate: '<h2>Sale Confirmation</h2>\n<p>Sale {{sale_number}} for {{weight_kg}} kg of {{material}} has been recorded on {{date}}.</p>\n<p>Client: {{client_name}}</p>\n<p>Location: {{location}}</p>\n<p>Total: ${{total_amount}}</p>',
+    deliverySubjectTemplate: 'CIVICycle - Delivery Confirmation {{sale_number}}',
+    deliveryBodyTemplate: '<h2>Delivery Confirmation</h2>\n<p>Sale {{sale_number}} has been delivered on {{date}}.</p>\n<p>Client: {{client_name}}</p>\n<p>Material: {{weight_kg}} kg of {{material}}</p>\n<p>Vehicle: {{vehicle_type}} - {{registration_number}}</p>\n<p>Driver: {{driver_name}} (ID: {{driver_id_card}})</p>',
   });
 
   useEffect(() => {
@@ -2185,14 +2191,19 @@ function ConfirmationsTab() {
         setSettings({
           purchaseEmailEnabled: data.purchaseEmailEnabled ?? false,
           saleEmailEnabled: data.saleEmailEnabled ?? false,
+          deliveryEmailEnabled: data.deliveryEmailEnabled ?? false,
           purchaseRecipientField: data.purchaseRecipientField || 'vendor',
           saleRecipientField: data.saleRecipientField || 'client',
+          deliveryRecipientField: data.deliveryRecipientField || 'client',
           customPurchaseEmail: data.customPurchaseEmail || '',
           customSaleEmail: data.customSaleEmail || '',
+          customDeliveryEmail: data.customDeliveryEmail || '',
           purchaseSubjectTemplate: data.purchaseSubjectTemplate || 'CIVICycle - Purchase Confirmation {{transaction_number}}',
           purchaseBodyTemplate: data.purchaseBodyTemplate || '<h2>Purchase Confirmation</h2>\n<p>Transaction {{transaction_number}} for {{weight_kg}} kg of {{material}} has been recorded on {{date}}.</p>\n<p>Vendor: {{vendor_name}}</p>\n<p>Location: {{location}}</p>\n<p>Total: ${{total_cost}}</p>',
           saleSubjectTemplate: data.saleSubjectTemplate || 'CIVICycle - Sale Confirmation {{sale_number}}',
           saleBodyTemplate: data.saleBodyTemplate || '<h2>Sale Confirmation</h2>\n<p>Sale {{sale_number}} for {{weight_kg}} kg of {{material}} has been recorded on {{date}}.</p>\n<p>Client: {{client_name}}</p>\n<p>Location: {{location}}</p>\n<p>Total: ${{total_amount}}</p>',
+          deliverySubjectTemplate: data.deliverySubjectTemplate || 'CIVICycle - Delivery Confirmation {{sale_number}}',
+          deliveryBodyTemplate: data.deliveryBodyTemplate || '<h2>Delivery Confirmation</h2>\n<p>Sale {{sale_number}} has been delivered on {{date}}.</p>\n<p>Client: {{client_name}}</p>\n<p>Material: {{weight_kg}} kg of {{material}}</p>\n<p>Vehicle: {{vehicle_type}} - {{registration_number}}</p>\n<p>Driver: {{driver_name}} (ID: {{driver_id_card}})</p>',
         });
       }
     } catch {
@@ -2217,6 +2228,7 @@ function ConfirmationsTab() {
   const commonParams = ['{{day}}', '{{month}}', '{{month_number}}', '{{year}}', '{{date}}'];
   const purchaseParams = ['{{transaction_number}}', '{{vendor_name}}', '{{vendor_email}}', '{{material}}', '{{location}}', '{{weight_kg}}', '{{unit_price}}', '{{total_cost}}', '{{payment_method}}', '{{notes}}'];
   const saleParams = ['{{sale_number}}', '{{client_name}}', '{{client_email}}', '{{material}}', '{{location}}', '{{weight_kg}}', '{{unit_price}}', '{{total_amount}}', '{{payment_method}}', '{{notes}}'];
+  const deliveryParams = ['{{sale_number}}', '{{client_name}}', '{{client_email}}', '{{material}}', '{{location}}', '{{weight_kg}}', '{{total_amount}}', '{{vehicle_type}}', '{{registration_number}}', '{{driver_name}}', '{{driver_id_card}}', '{{delivery_notes}}'];
 
   if (loading) return <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>;
 
@@ -2409,6 +2421,77 @@ function ConfirmationsTab() {
                       <span className="font-semibold text-gray-700">Sale:</span>{' '}
                       {saleParams.map((p, i) => (
                         <span key={p}><code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800">{p}</code>{i < saleParams.length - 1 ? ' ' : ''}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Delivery confirmations */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">{t('admin.deliveryConfirmations')}</h3>
+              <p className="text-sm text-gray-500">{t('admin.deliveryConfirmationsDesc')}</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" checked={settings.deliveryEmailEnabled}
+                onChange={(e) => setSettings({ ...settings, deliveryEmailEnabled: e.target.checked })}
+                className="sr-only peer" />
+              <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-primary-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all" />
+            </label>
+          </div>
+          {settings.deliveryEmailEnabled && (
+            <div className="space-y-4 pl-4 border-l-2 border-primary-200">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('admin.recipientType')}</label>
+                <select value={settings.deliveryRecipientField}
+                  onChange={(e) => setSettings({ ...settings, deliveryRecipientField: e.target.value as 'client' | 'custom' })}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
+                  <option value="client">{t('admin.clientEmail')}</option>
+                  <option value="custom">{t('admin.customEmail')}</option>
+                </select>
+              </div>
+              {settings.deliveryRecipientField === 'custom' && (
+                <div>
+                  <input type="email" value={settings.customDeliveryEmail}
+                    onChange={(e) => setSettings({ ...settings, customDeliveryEmail: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                    placeholder="delivery@example.com" />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('admin.subjectTemplate')}</label>
+                <textarea value={settings.deliverySubjectTemplate} rows={1}
+                  onChange={(e) => setSettings({ ...settings, deliverySubjectTemplate: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('admin.bodyTemplate')}</label>
+                <textarea value={settings.deliveryBodyTemplate} rows={6}
+                  onChange={(e) => setSettings({ ...settings, deliveryBodyTemplate: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm" />
+              </div>
+              <div>
+                <button type="button" onClick={() => setShowDeliveryParams(!showDeliveryParams)}
+                  className="text-sm text-primary-600 hover:text-primary-800 font-medium">
+                  {showDeliveryParams ? t('admin.hideParameters') : t('admin.showParameters')}
+                </button>
+                {showDeliveryParams && (
+                  <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs space-y-2">
+                    <div>
+                      <span className="font-semibold text-gray-700">Common:</span>{' '}
+                      {commonParams.map((p, i) => (
+                        <span key={p}><code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800">{p}</code>{i < commonParams.length - 1 ? ' ' : ''}</span>
+                      ))}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-gray-700">Delivery:</span>{' '}
+                      {deliveryParams.map((p, i) => (
+                        <span key={p}><code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800">{p}</code>{i < deliveryParams.length - 1 ? ' ' : ''}</span>
                       ))}
                     </div>
                   </div>

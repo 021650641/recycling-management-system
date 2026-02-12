@@ -92,6 +92,12 @@ export const inventoryAPI = {
   getMovements: (params?: any) => api.get('/inventory/movements', { params }),
 };
 
+// Delivery API
+export const deliveryAPI = {
+  getPersons: (search?: string) => api.get('/delivery/persons', { params: { search } }),
+  getVehicles: (search?: string) => api.get('/delivery/vehicles', { params: { search } }),
+};
+
 // Reports API
 export const reportsAPI = {
   getSummary: (params?: any) => api.get('/reports/summary', { params }),

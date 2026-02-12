@@ -441,7 +441,20 @@
     "reversing": "Reversando",
     "stockWarningTitle": "Stock Insuficiente",
     "stockWarningMessage": "Esta venta es por {{requested}} kg de {{material}}. El stock en {{location}} es solo {{available}} kg.",
-    "stockWarningContinue": "Desea continuar?"
+    "stockWarningContinue": "Desea continuar?",
+    "deliveryDetails": "Detalles de Entrega",
+    "vehicleInfo": "Informacion del Vehiculo",
+    "vehicleType": "Tipo de Vehiculo",
+    "vehicleTypePlaceholder": "ej. Camion, Furgoneta, Pickup",
+    "registrationNumber": "Numero de Placa",
+    "registrationPlaceholder": "ej. ABC-1234",
+    "driverInfo": "Informacion del Conductor",
+    "driverName": "Nombre Completo",
+    "driverNamePlaceholder": "Nombre completo del conductor",
+    "driverIdCard": "Numero de Cedula",
+    "driverIdPlaceholder": "Numero de cedula",
+    "deliveryNotes": "Notas de Entrega",
+    "deliveryNotesPlaceholder": "Notas de entrega opcionales..."
   },
   "traceability": {
     "title": "Trazabilidad",
@@ -575,7 +588,9 @@
     "salePrefixHint": "Por defecto: SL (ej. SL-ABC123)",
     "prefixesSaved": "Prefijos guardados",
     "encryption": "Encriptacion",
-    "encryptionDesc": "La encriptacion de base de datos esta habilitada. Los datos sensibles (IDs gubernamentales) estan encriptados en reposo con AES-256."
+    "encryptionDesc": "La encriptacion de base de datos esta habilitada. Los datos sensibles (IDs gubernamentales) estan encriptados en reposo con AES-256.",
+    "deliveryConfirmations": "Confirmaciones de Entrega",
+    "deliveryConfirmationsDesc": "Enviar confirmaciones por email cuando se completan las entregas"
   },
   "users": {
     "title": "Gestion de Usuarios",

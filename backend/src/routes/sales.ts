@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { query } from '../db';
 import { authenticate, authorize } from '../middleware/auth';
 import logger from '../services/logger';
-import { sendSaleConfirmation } from '../services/confirmationService';
+import { sendSaleConfirmation, sendDeliveryConfirmation } from '../services/confirmationService';
 
 const router = Router();
 router.use(authenticate);
@@ -165,18 +165,62 @@ router.patch('/:id/payment', authorize('admin', 'manager'), async (req, res, nex
 // Update delivery status
 router.patch('/:id/delivery', authorize('admin', 'manager'), async (req, res, next): Promise<any> => {
   try {
-    const { deliveryStatus } = req.body;
-    console.log('Delivery update request:', { id: req.params.id, deliveryStatus });
-    const result = await query(
-      `UPDATE sale SET
-        delivery_status = $1,
-        delivered_at = CASE WHEN $1 = 'delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END
-      WHERE id = $2 RETURNING *`,
-      [deliveryStatus, req.params.id]
-    );
+    const { deliveryStatus, vehicleType, registrationNumber, driverName, driverIdCard, deliveryNotes } = req.body;
+    const saleId = req.params.id;
+
+    let result;
+
+    if (deliveryStatus === 'delivered') {
+      // Upsert delivery vehicle
+      const vehicleResult = await query(
+        `INSERT INTO delivery_vehicle (vehicle_type, registration_number)
+         VALUES ($1, $2)
+         ON CONFLICT (registration_number) DO UPDATE SET vehicle_type = EXCLUDED.vehicle_type
+         RETURNING id`,
+        [vehicleType, registrationNumber]
+      );
+      const deliveryVehicleId = vehicleResult.rows[0].id;
+
+      // Upsert delivery person
+      const personResult = await query(
+        `INSERT INTO delivery_person (full_name, id_card_number)
+         VALUES ($1, $2)
+         ON CONFLICT (full_name, id_card_number) DO UPDATE SET full_name = EXCLUDED.full_name
+         RETURNING id`,
+        [driverName, driverIdCard]
+      );
+      const deliveryPersonId = personResult.rows[0].id;
+
+      // Update sale with full delivery details
+      result = await query(
+        `UPDATE sale SET
+          delivery_status = $1,
+          delivered_at = CURRENT_TIMESTAMP,
+          delivery_person_id = $2,
+          delivery_vehicle_id = $3,
+          delivery_notes = $4
+        WHERE id = $5 RETURNING *`,
+        [deliveryStatus, deliveryPersonId, deliveryVehicleId, deliveryNotes, saleId]
+      );
+    } else {
+      // Non-delivered status: just update delivery_status
+      result = await query(
+        `UPDATE sale SET
+          delivery_status = $1
+        WHERE id = $2 RETURNING *`,
+        [deliveryStatus, saleId]
+      );
+    }
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Sale not found' });
     }
+
+    // Send delivery confirmation email (async, don't block response)
+    if (deliveryStatus === 'delivered') {
+      sendDeliveryConfirmation(saleId).catch(() => {});
+    }
+
     res.json(result.rows[0]);
   } catch (error: any) {
     console.error('Delivery update error:', error.message, error.detail || '');

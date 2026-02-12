@@ -441,7 +441,20 @@
     "reversing": "Reversing",
     "stockWarningTitle": "Insufficient Stock",
     "stockWarningMessage": "This sale is for {{requested}} kg of {{material}}. The stock at {{location}} is only {{available}} kg.",
-    "stockWarningContinue": "Do you want to continue?"
+    "stockWarningContinue": "Do you want to continue?",
+    "deliveryDetails": "Delivery Details",
+    "vehicleInfo": "Vehicle Information",
+    "vehicleType": "Vehicle Type",
+    "vehicleTypePlaceholder": "e.g. Truck, Van, Pickup",
+    "registrationNumber": "Registration Number",
+    "registrationPlaceholder": "e.g. ABC-1234",
+    "driverInfo": "Driver Information",
+    "driverName": "Full Name",
+    "driverNamePlaceholder": "Driver full name",
+    "driverIdCard": "ID Card Number",
+    "driverIdPlaceholder": "ID card number",
+    "deliveryNotes": "Delivery Notes",
+    "deliveryNotesPlaceholder": "Optional delivery notes..."
   },
   "traceability": {
     "title": "Traceability",
@@ -575,7 +588,9 @@
     "salePrefixHint": "Default: SL (e.g. SL-ABC123)",
     "prefixesSaved": "Prefixes saved",
     "encryption": "Encryption",
-    "encryptionDesc": "Database encryption is enabled. Sensitive data (government IDs) is encrypted at rest using AES-256."
+    "encryptionDesc": "Database encryption is enabled. Sensitive data (government IDs) is encrypted at rest using AES-256.",
+    "deliveryConfirmations": "Delivery Confirmations",
+    "deliveryConfirmationsDesc": "Send email confirmations when deliveries are completed"
   },
   "users": {
     "title": "User Management",

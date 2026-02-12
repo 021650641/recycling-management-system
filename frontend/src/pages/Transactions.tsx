@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { transactionsAPI, salesAPI, clientsAPI, materialsAPI, locationsAPI, inventoryAPI } from '@/lib/api';
+import { transactionsAPI, salesAPI, clientsAPI, materialsAPI, locationsAPI, inventoryAPI, deliveryAPI } from '@/lib/api';
 import {
   Plus, Filter, Search, Save, X, DollarSign, Truck,
   ShoppingCart, ArrowLeftRight, FileText, RotateCcw, Eye,
@@ -625,6 +625,7 @@ function SalesTab() {
   const [editingNotes, setEditingNotes] = useState<{ id: string; notes: string } | null>(null);
   const [voidingId, setVoidingId] = useState<string | null>(null);
   const [viewingSale, setViewingSale] = useState<any>(null);
+  const [deliveringId, setDeliveringId] = useState<string | null>(null);
   const [collapsedPairs, setCollapsedPairs] = useState<Set<string>>(new Set());
 
   useEffect(() => { loadData(); loadFormOptions(); }, []);
@@ -684,10 +685,12 @@ function SalesTab() {
     }
   };
 
-  const handleUpdateDelivery = async (id: string, deliveryStatus: string) => {
+  const handleUpdateDelivery = async (data: any) => {
+    if (!deliveringId) return;
     try {
-      await salesAPI.updateDelivery(id, { deliveryStatus });
+      await salesAPI.updateDelivery(deliveringId, data);
       toast.success(t('sales.deliveryUpdated'));
+      setDeliveringId(null);
       loadData();
     } catch (error: any) {
       toast.error(error.response?.data?.error || t('sales.deliveryUpdateError'));
@@ -779,6 +782,7 @@ function SalesTab() {
       {editingNotes && <NotesModal notes={editingNotes.notes} title={t('sales.editNotes')} onSave={handleUpdateNotes} onClose={() => setEditingNotes(null)} />}
       {voidingId && <VoidConfirmModal message={t('sales.voidConfirm')} reasonLabel={t('sales.voidReason')} onConfirm={handleVoid} onClose={() => setVoidingId(null)} />}
       {viewingSale && <SaleDetailModal sale={viewingSale} onClose={() => setViewingSale(null)} />}
+      {deliveringId && <DeliveryModal onSave={handleUpdateDelivery} onClose={() => setDeliveringId(null)} />}
 
       <div className="flex items-center gap-3">
         <p className="text-sm text-gray-500">{t('sales.totalSales', { count: total })}</p>
@@ -869,7 +873,7 @@ function SalesTab() {
                               </button>
                             )}
                             {sale.delivery_status !== 'delivered' && !isRev && (
-                              <button onClick={() => handleUpdateDelivery(sale.id, 'delivered')} className="text-blue-600 hover:text-blue-800 p-1" title={t('sales.markAsDelivered')}>
+                              <button onClick={() => setDeliveringId(sale.id)} className="text-blue-600 hover:text-blue-800 p-1" title={t('sales.markAsDelivered')}>
                                 <Truck className="w-4 h-4" />
                               </button>
                             )}
@@ -1047,5 +1051,144 @@ function SaleForm({ clients, materials, locations, onSave, onCancel }: {
         </div>
       )}
     </>
+  );
+}
+
+// ===== Delivery Details Modal =====
+function DeliveryModal({ onSave, onClose }: { onSave: (data: any) => void; onClose: () => void }) {
+  const { t } = useTranslation();
+  const [form, setForm] = useState({ vehicleType: '', registrationNumber: '', driverName: '', driverIdCard: '', deliveryNotes: '' });
+  const [persons, setPersons] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [showPersons, setShowPersons] = useState(false);
+  const [showVehicles, setShowVehicles] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    deliveryAPI.getPersons().then(r => setPersons(r.data || [])).catch(() => {});
+    deliveryAPI.getVehicles().then(r => setVehicles(r.data || [])).catch(() => {});
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    await onSave({ deliveryStatus: 'delivered', ...form });
+    setSaving(false);
+  };
+
+  const selectPerson = (p: any) => {
+    setForm({ ...form, driverName: p.full_name, driverIdCard: p.id_card_number || '' });
+    setShowPersons(false);
+  };
+
+  const selectVehicle = (v: any) => {
+    setForm({ ...form, vehicleType: v.vehicle_type, registrationNumber: v.registration_number });
+    setShowVehicles(false);
+  };
+
+  const filteredPersons = persons.filter(p =>
+    p.full_name?.toLowerCase().includes(form.driverName.toLowerCase()) ||
+    (p.id_card_number || '').toLowerCase().includes(form.driverName.toLowerCase())
+  );
+
+  const filteredVehicles = vehicles.filter(v =>
+    v.vehicle_type?.toLowerCase().includes(form.registrationNumber.toLowerCase()) ||
+    v.registration_number?.toLowerCase().includes(form.registrationNumber.toLowerCase())
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
+          <Truck className="w-5 h-5 text-blue-600" />
+          <h3 className="text-lg font-semibold text-gray-900">{t('sales.deliveryDetails')}</h3>
+          <button onClick={onClose} className="ml-auto text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Vehicle section */}
+          <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">{t('sales.vehicleInfo')}</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('sales.vehicleType')} *</label>
+              <input type="text" value={form.vehicleType} required
+                onChange={(e) => setForm({ ...form, vehicleType: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                placeholder={t('sales.vehicleTypePlaceholder')} />
+            </div>
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('sales.registrationNumber')} *</label>
+              <input type="text" value={form.registrationNumber} required
+                onChange={(e) => { setForm({ ...form, registrationNumber: e.target.value }); setShowVehicles(true); }}
+                onFocus={() => setShowVehicles(true)}
+                onBlur={() => setTimeout(() => setShowVehicles(false), 200)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                placeholder={t('sales.registrationPlaceholder')} />
+              {showVehicles && filteredVehicles.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                  {filteredVehicles.map(v => (
+                    <button key={v.id} type="button" onMouseDown={() => selectVehicle(v)}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                      <span className="font-medium">{v.registration_number}</span>
+                      <span className="text-gray-500 ml-2">{v.vehicle_type}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Driver section */}
+          <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">{t('sales.driverInfo')}</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('sales.driverName')} *</label>
+              <input type="text" value={form.driverName} required
+                onChange={(e) => { setForm({ ...form, driverName: e.target.value }); setShowPersons(true); }}
+                onFocus={() => setShowPersons(true)}
+                onBlur={() => setTimeout(() => setShowPersons(false), 200)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                placeholder={t('sales.driverNamePlaceholder')} />
+              {showPersons && filteredPersons.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                  {filteredPersons.map(p => (
+                    <button key={p.id} type="button" onMouseDown={() => selectPerson(p)}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                      <span className="font-medium">{p.full_name}</span>
+                      {p.id_card_number && <span className="text-gray-500 ml-2">ID: {p.id_card_number}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('sales.driverIdCard')} *</label>
+              <input type="text" value={form.driverIdCard} required
+                onChange={(e) => setForm({ ...form, driverIdCard: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                placeholder={t('sales.driverIdPlaceholder')} />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('sales.deliveryNotes')}</label>
+            <textarea value={form.deliveryNotes} onChange={(e) => setForm({ ...form, deliveryNotes: e.target.value })} rows={2}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              placeholder={t('sales.deliveryNotesPlaceholder')} />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
+              {t('common.cancel')}
+            </button>
+            <button type="submit" disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">
+              <Truck className="w-4 h-4" />
+              {saving ? t('common.loading') : t('sales.markAsDelivered')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

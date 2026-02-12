@@ -24,6 +24,7 @@ import userRoutes from './routes/users';
 import settingsRoutes from './routes/settings';
 import logRoutes from './routes/logs';
 import scheduleRoutes from './routes/schedules';
+import deliveryRoutes from './routes/delivery';
 
 const app = express();
 
@@ -65,6 +66,7 @@ apiRouter.use('/users', userRoutes);
 apiRouter.use('/settings', settingsRoutes);
 apiRouter.use('/logs', logRoutes);
 apiRouter.use('/schedules', scheduleRoutes);
+apiRouter.use('/delivery', deliveryRoutes);
 
 app.use(config.apiPrefix, apiRouter);
 
