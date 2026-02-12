@@ -15,7 +15,6 @@ import NewTransaction from '@/pages/NewTransaction';
 import Inventory from '@/pages/Inventory';
 import Reports from '@/pages/Reports';
 import AdminPanel from '@/pages/AdminPanel';
-import UsersPage from '@/pages/Users';
 import Vendors from '@/pages/Vendors';
 import Clients from '@/pages/Clients';
 import Sources from '@/pages/Sources';
@@ -94,14 +93,6 @@ function App() {
             element={
               <ProtectedRoute requiredRole={['admin', 'manager']}>
                 <AdminPanel />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="users"
-            element={
-              <ProtectedRoute requiredRole={['admin']}>
-                <UsersPage />
               </ProtectedRoute>
             }
           />

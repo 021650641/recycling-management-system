@@ -9,7 +9,6 @@ import {
   Package,
   BarChart3,
   Settings,
-  Users,
   LogOut,
   Menu,
   X,
@@ -103,7 +102,6 @@ export default function Layout() {
 
   const adminItems = [
     { path: '/admin', label: t('nav.adminPanel'), icon: Settings, roles: ['admin', 'manager'] },
-    { path: '/users', label: t('nav.users'), icon: Users, roles: ['admin'] },
   ];
 
   const helpItems = [
