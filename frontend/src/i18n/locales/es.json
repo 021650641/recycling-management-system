@@ -438,7 +438,10 @@
     "notDelivered": "No Entregado",
     "partial": "Parcial",
     "reversed": "Reversado",
-    "reversing": "Reversando"
+    "reversing": "Reversando",
+    "stockWarningTitle": "Stock Insuficiente",
+    "stockWarningMessage": "Esta venta es por {{requested}} kg de {{material}}. El stock en {{location}} es solo {{available}} kg.",
+    "stockWarningContinue": "Desea continuar?"
   },
   "traceability": {
     "title": "Trazabilidad",

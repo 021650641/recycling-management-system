@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { transactionsAPI, salesAPI, clientsAPI, materialsAPI, locationsAPI } from '@/lib/api';
+import { transactionsAPI, salesAPI, clientsAPI, materialsAPI, locationsAPI, inventoryAPI } from '@/lib/api';
 import {
   Plus, Filter, Search, Save, X, DollarSign, Truck,
   ShoppingCart, ArrowLeftRight, FileText, RotateCcw, Eye,
-  ChevronDown, ChevronRight, Printer,
+  ChevronDown, ChevronRight, Printer, AlertTriangle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -905,83 +905,147 @@ function SaleForm({ clients, materials, locations, onSave, onCancel }: {
   const [formData, setFormData] = useState({
     clientId: '', locationId: '', materialCategoryId: '', weightKg: '', unitPrice: '', paymentMethod: 'bank_transfer', notes: '',
   });
+  const [stockWarning, setStockWarning] = useState<{ materialName: string; locationName: string; requested: number; available: number } | null>(null);
+  const [pendingData, setPendingData] = useState<any>(null);
   const totalAmount = (parseFloat(formData.weightKg || '0') * parseFloat(formData.unitPrice || '0')).toFixed(2);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const buildSaleData = () => ({
+    clientId: formData.clientId, locationId: formData.locationId, materialCategoryId: formData.materialCategoryId,
+    weightKg: parseFloat(formData.weightKg), unitPrice: parseFloat(formData.unitPrice) || undefined,
+    paymentMethod: formData.paymentMethod, notes: formData.notes || undefined,
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      clientId: formData.clientId, locationId: formData.locationId, materialCategoryId: formData.materialCategoryId,
-      weightKg: parseFloat(formData.weightKg), unitPrice: parseFloat(formData.unitPrice) || undefined,
-      paymentMethod: formData.paymentMethod, notes: formData.notes || undefined,
-    });
+    const data = buildSaleData();
+    try {
+      const res = await inventoryAPI.getAll({ locationId: formData.locationId });
+      const items = res.data?.inventory || res.data || [];
+      const match = items.find((item: any) => item.material_category_id === formData.materialCategoryId);
+      const available = parseFloat(match?.quantity_kg || '0');
+      const requested = parseFloat(formData.weightKg);
+      if (requested > available) {
+        const mat = materials.find(m => m.id === formData.materialCategoryId);
+        const loc = locations.find(l => l.id === formData.locationId);
+        setStockWarning({ materialName: mat?.name || '', locationName: loc?.name || '', requested, available });
+        setPendingData(data);
+        return;
+      }
+    } catch {
+      // If inventory check fails, proceed without warning
+    }
+    onSave(data);
+  };
+
+  const handleConfirmOverstock = () => {
+    if (pendingData) onSave(pendingData);
+    setStockWarning(null);
+    setPendingData(null);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
-      <h2 className="text-lg font-semibold text-gray-900">{t('sales.create')}</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.client')} *</label>
-          <select value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required>
-            <option value="">{t('sales.selectClient')}</option>
-            {clients.filter(c => c.is_active !== false).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+    <>
+      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
+        <h2 className="text-lg font-semibold text-gray-900">{t('sales.create')}</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.client')} *</label>
+            <select value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required>
+              <option value="">{t('sales.selectClient')}</option>
+              {clients.filter(c => c.is_active !== false).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.location')} *</label>
+            <select value={formData.locationId} onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required>
+              <option value="">{t('sales.selectLocation')}</option>
+              {locations.filter(l => l.is_active !== false).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.material')} *</label>
+            <select value={formData.materialCategoryId} onChange={(e) => setFormData({ ...formData, materialCategoryId: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required>
+              <option value="">{t('sales.selectMaterial')}</option>
+              {materials.filter(m => m.is_active !== false).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.paymentMethod')}</label>
+            <select value={formData.paymentMethod} onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
+              <option value="cash">{t('sales.cash')}</option>
+              <option value="bank_transfer">{t('sales.bankTransfer')}</option>
+              <option value="mobile_money">{t('sales.mobileMoney')}</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.weightKg')} *</label>
+            <input type="number" step="0.01" value={formData.weightKg} onChange={(e) => setFormData({ ...formData, weightKg: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="0.00" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.unitPrice')}</label>
+            <input type="number" step="0.01" value={formData.unitPrice} onChange={(e) => setFormData({ ...formData, unitPrice: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder={t('sales.autoFromDailyPrice')} />
+          </div>
         </div>
+        {formData.weightKg && formData.unitPrice && (
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <p className="text-sm text-gray-600">{t('sales.totalAmount')}: <span className="font-semibold text-gray-900">${totalAmount}</span></p>
+          </div>
+        )}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.location')} *</label>
-          <select value={formData.locationId} onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required>
-            <option value="">{t('sales.selectLocation')}</option>
-            {locations.filter(l => l.is_active !== false).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.notes')}</label>
+          <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={2}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder={t('sales.notesPlaceholder')} />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.material')} *</label>
-          <select value={formData.materialCategoryId} onChange={(e) => setFormData({ ...formData, materialCategoryId: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required>
-            <option value="">{t('sales.selectMaterial')}</option>
-            {materials.filter(m => m.is_active !== false).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
+        <div className="flex gap-2 pt-2">
+          <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
+            <Save className="w-4 h-4" /> {t('common.save')}
+          </button>
+          <button type="button" onClick={onCancel} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
+            <X className="w-4 h-4" /> {t('common.cancel')}
+          </button>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.paymentMethod')}</label>
-          <select value={formData.paymentMethod} onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
-            <option value="cash">{t('sales.cash')}</option>
-            <option value="bank_transfer">{t('sales.bankTransfer')}</option>
-            <option value="mobile_money">{t('sales.mobileMoney')}</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.weightKg')} *</label>
-          <input type="number" step="0.01" value={formData.weightKg} onChange={(e) => setFormData({ ...formData, weightKg: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="0.00" required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.unitPrice')}</label>
-          <input type="number" step="0.01" value={formData.unitPrice} onChange={(e) => setFormData({ ...formData, unitPrice: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder={t('sales.autoFromDailyPrice')} />
-        </div>
-      </div>
-      {formData.weightKg && formData.unitPrice && (
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-sm text-gray-600">{t('sales.totalAmount')}: <span className="font-semibold text-gray-900">${totalAmount}</span></p>
+      </form>
+
+      {/* Stock warning confirmation modal */}
+      {stockWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="flex items-center gap-3 p-4 border-b border-gray-200">
+              <div className="p-2 bg-amber-100 rounded-full">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">{t('sales.stockWarningTitle')}</h3>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-700">
+                {t('sales.stockWarningMessage', {
+                  requested: stockWarning.requested.toFixed(2),
+                  material: stockWarning.materialName,
+                  available: stockWarning.available.toFixed(2),
+                  location: stockWarning.locationName,
+                })}
+              </p>
+              <p className="text-sm text-gray-500 mt-2">{t('sales.stockWarningContinue')}</p>
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t border-gray-200">
+              <button onClick={() => { setStockWarning(null); setPendingData(null); }}
+                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                {t('common.no')}
+              </button>
+              <button onClick={handleConfirmOverstock}
+                className="px-4 py-2 text-sm text-white bg-amber-600 hover:bg-amber-700 rounded-lg">
+                {t('common.yes')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">{t('sales.notes')}</label>
-        <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={2}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder={t('sales.notesPlaceholder')} />
-      </div>
-      <div className="flex gap-2 pt-2">
-        <button type="submit" className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">
-          <Save className="w-4 h-4" /> {t('common.save')}
-        </button>
-        <button type="button" onClick={onCancel} className="flex items-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg">
-          <X className="w-4 h-4" /> {t('common.cancel')}
-        </button>
-      </div>
-    </form>
+    </>
   );
 }
