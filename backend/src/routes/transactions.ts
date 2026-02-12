@@ -184,4 +184,71 @@ router.patch('/:id/payment', authorize('admin', 'manager'), async (req, res, nex
   }
 });
 
+// Update transaction notes
+router.patch('/:id/notes', authorize('admin', 'manager', 'operator'), async (req, res, next) => {
+  try {
+    const { notes } = req.body;
+    const result = await query(
+      'UPDATE transaction SET notes = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      [notes, req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    return res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+    return;
+  }
+});
+
+// Void/reverse a transaction (purchase)
+router.post('/:id/void', authorize('admin', 'manager'), async (req: any, res, next) => {
+  try {
+    const original = await query('SELECT * FROM transaction WHERE id = $1', [req.params.id]);
+    if (original.rows.length === 0) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    const tx = original.rows[0];
+
+    if (tx.transaction_number.startsWith('REV-')) {
+      return res.status(400).json({ error: 'Cannot void a reversal transaction' });
+    }
+
+    const existingReversal = await query(
+      "SELECT id FROM transaction WHERE transaction_number = $1",
+      [`REV-${tx.transaction_number}`]
+    );
+    if (existingReversal.rows.length > 0) {
+      return res.status(400).json({ error: 'This transaction has already been voided' });
+    }
+
+    const reversalNumber = `REV-${tx.transaction_number}`;
+    const result = await query(
+      `INSERT INTO transaction (
+        transaction_number, location_id, material_category_id, source_type,
+        apartment_complex_id, apartment_unit_id, waste_picker_id,
+        weight_kg, quality_grade, unit_price, total_cost,
+        payment_status, payment_method, paid_amount,
+        notes, recorded_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      RETURNING *`,
+      [
+        reversalNumber, tx.location_id, tx.material_category_id, tx.source_type,
+        tx.apartment_complex_id, tx.apartment_unit_id, tx.waste_picker_id,
+        -Math.abs(tx.weight_kg), tx.quality_grade, tx.unit_price, -Math.abs(tx.total_cost),
+        'paid', tx.payment_method, -Math.abs(tx.paid_amount || 0),
+        `Reversal of ${tx.transaction_number}. ${req.body.reason || ''}`.trim(),
+        req.user.id
+      ]
+    );
+
+    return res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+    return;
+  }
+});
+
 export default router;

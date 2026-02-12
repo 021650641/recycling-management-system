@@ -49,7 +49,9 @@ export const transactionsAPI = {
   create: (data: any) => api.post('/transactions', data),
   update: (id: string, data: any) => api.put(`/transactions/${id}`, data),
   delete: (id: string) => api.delete(`/transactions/${id}`),
-  updatePayment: (id: string, data: any) => api.put(`/transactions/${id}/payment`, data),
+  updatePayment: (id: string, data: any) => api.patch(`/transactions/${id}/payment`, data),
+  updateNotes: (id: string, data: any) => api.patch(`/transactions/${id}/notes`, data),
+  voidTransaction: (id: string, data?: any) => api.post(`/transactions/${id}/void`, data || {}),
 };
 
 // Materials API
@@ -154,6 +156,8 @@ export const salesAPI = {
   create: (data: any) => api.post('/sales', data),
   updatePayment: (id: string, data: any) => api.patch(`/sales/${id}/payment`, data),
   updateDelivery: (id: string, data: any) => api.patch(`/sales/${id}/delivery`, data),
+  updateNotes: (id: string, data: any) => api.patch(`/sales/${id}/notes`, data),
+  voidSale: (id: string, data?: any) => api.post(`/sales/${id}/void`, data || {}),
 };
 
 // Users API

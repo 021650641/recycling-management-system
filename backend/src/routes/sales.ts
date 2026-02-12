@@ -146,6 +146,7 @@ router.patch('/:id/payment', authorize('admin', 'manager'), async (req, res, nex
 router.patch('/:id/delivery', authorize('admin', 'manager'), async (req, res, next): Promise<any> => {
   try {
     const { deliveryStatus } = req.body;
+    console.log('Delivery update request:', { id: req.params.id, deliveryStatus });
     const result = await query(
       `UPDATE sale SET
         delivery_status = $1,
@@ -157,6 +158,74 @@ router.patch('/:id/delivery', authorize('admin', 'manager'), async (req, res, ne
       return res.status(404).json({ error: 'Sale not found' });
     }
     res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Delivery update error:', error.message, error.detail || '');
+    next(error);
+  }
+});
+
+// Update sale notes
+router.patch('/:id/notes', authorize('admin', 'manager', 'operator'), async (req, res, next): Promise<any> => {
+  try {
+    const { notes } = req.body;
+    const result = await query(
+      'UPDATE sale SET notes = $1 WHERE id = $2 RETURNING *',
+      [notes, req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Sale not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Void/reverse a sale
+router.post('/:id/void', authorize('admin', 'manager'), async (req: any, res, next): Promise<any> => {
+  try {
+    // Get the original sale
+    const original = await query('SELECT * FROM sale WHERE id = $1', [req.params.id]);
+    if (original.rows.length === 0) {
+      return res.status(404).json({ error: 'Sale not found' });
+    }
+
+    const sale = original.rows[0];
+
+    // Check if already voided
+    if (sale.sale_number.startsWith('REV-')) {
+      return res.status(400).json({ error: 'Cannot void a reversal transaction' });
+    }
+
+    // Check if a reversal already exists
+    const existingReversal = await query(
+      "SELECT id FROM sale WHERE sale_number = $1",
+      [`REV-${sale.sale_number}`]
+    );
+    if (existingReversal.rows.length > 0) {
+      return res.status(400).json({ error: 'This sale has already been voided' });
+    }
+
+    // Create reversal with negative values
+    const reversalNumber = `REV-${sale.sale_number}`;
+    const result = await query(
+      `INSERT INTO sale (
+        sale_number, client_id, location_id, material_category_id,
+        weight_kg, unit_price, total_amount,
+        payment_status, payment_method, paid_amount,
+        delivery_status, notes, created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING *`,
+      [
+        reversalNumber, sale.client_id, sale.location_id, sale.material_category_id,
+        -Math.abs(sale.weight_kg), sale.unit_price, -Math.abs(sale.total_amount),
+        'paid', sale.payment_method, -Math.abs(sale.paid_amount || 0),
+        sale.delivery_status, `Reversal of ${sale.sale_number}. ${req.body.reason || ''}`.trim(),
+        req.user.id
+      ]
+    );
+
+    res.status(201).json(result.rows[0]);
   } catch (error) {
     next(error);
   }

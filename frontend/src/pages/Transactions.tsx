@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { transactionsAPI, salesAPI, clientsAPI, materialsAPI, locationsAPI } from '@/lib/api';
-import { Plus, Filter, Search, Save, X, DollarSign, Truck, ShoppingCart, ArrowLeftRight } from 'lucide-react';
+import {
+  Plus, Filter, Search, Save, X, DollarSign, Truck,
+  ShoppingCart, ArrowLeftRight, FileText, RotateCcw,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -69,7 +72,6 @@ function NewSaleButton() {
   return (
     <button
       onClick={() => {
-        // Dispatch custom event to toggle form in SalesTab
         window.dispatchEvent(new CustomEvent('toggle-sale-form'));
       }}
       className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors"
@@ -77,6 +79,99 @@ function NewSaleButton() {
       <Plus className="w-5 h-5" />
       {t('sales.create')}
     </button>
+  );
+}
+
+// ===== Notes Edit Modal =====
+function NotesModal({
+  notes, onSave, onClose, title,
+}: {
+  notes: string; onSave: (notes: string) => void; onClose: () => void; title: string;
+}) {
+  const { t } = useTranslation();
+  const [value, setValue] = useState(notes || '');
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-4">
+          <textarea
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            rows={4}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+            placeholder={t('common.notes')}
+            autoFocus
+          />
+        </div>
+        <div className="flex justify-end gap-2 p-4 border-t">
+          <button onClick={onClose} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
+            {t('common.cancel')}
+          </button>
+          <button
+            onClick={() => onSave(value)}
+            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
+          >
+            <Save className="w-4 h-4" /> {t('common.save')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Void Confirmation Modal =====
+function VoidConfirmModal({
+  message, onConfirm, onClose, reasonLabel,
+}: {
+  message: string; onConfirm: (reason: string) => void; onClose: () => void; reasonLabel: string;
+}) {
+  const { t } = useTranslation();
+  const [reason, setReason] = useState('');
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="text-lg font-semibold text-red-600 flex items-center gap-2">
+            <RotateCcw className="w-5 h-5" />
+            {t('transactions.void')}
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-gray-700">{message}</p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{reasonLabel}</label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={2}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 p-4 border-t">
+          <button onClick={onClose} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
+            {t('common.cancel')}
+          </button>
+          <button
+            onClick={() => onConfirm(reason)}
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
+          >
+            <RotateCcw className="w-4 h-4" /> {t('transactions.void')}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -88,6 +183,11 @@ function PurchasesTab() {
   const [filterPayment, setFilterPayment] = useState<'all' | 'paid' | 'pending' | 'partial'>('all');
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Notes editing state
+  const [editingNotes, setEditingNotes] = useState<{ id: string; notes: string } | null>(null);
+  // Void confirmation state
+  const [voidingId, setVoidingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -105,12 +205,50 @@ function PurchasesTab() {
     }
   };
 
+  const handleMarkAsPaid = async (tx: any) => {
+    try {
+      await transactionsAPI.updatePayment(tx.transaction_id || tx.id, {
+        paymentStatus: 'paid',
+        paidAmount: tx.total_cost,
+      });
+      toast.success(t('transactions.paid'));
+      loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || t('transactions.paymentUpdateError'));
+    }
+  };
+
+  const handleUpdateNotes = async (notes: string) => {
+    if (!editingNotes) return;
+    try {
+      await transactionsAPI.updateNotes(editingNotes.id, { notes });
+      toast.success(t('transactions.notesUpdated'));
+      setEditingNotes(null);
+      loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || t('transactions.notesUpdateError'));
+    }
+  };
+
+  const handleVoid = async (reason: string) => {
+    if (!voidingId) return;
+    try {
+      await transactionsAPI.voidTransaction(voidingId, { reason });
+      toast.success(t('transactions.voided'));
+      setVoidingId(null);
+      loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || t('transactions.voidError'));
+    }
+  };
+
   const filteredTransactions = transactions?.filter(transaction => {
     const matchesSearch =
       searchTerm === '' ||
       (transaction.source_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (transaction.material_category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (transaction.location_name || '').toLowerCase().includes(searchTerm.toLowerCase());
+      (transaction.location_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (transaction.transaction_number || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesType = filterType === 'all' || transaction.source_type === filterType;
     const matchesPayment = filterPayment === 'all' || transaction.payment_status === filterPayment;
@@ -125,8 +263,35 @@ function PurchasesTab() {
     pending: transactions?.filter(tx => tx.payment_status !== 'paid').length || 0,
   };
 
+  const isReversed = (tx: any) => {
+    const txNum = tx.transaction_number || '';
+    return txNum.startsWith('REV-') || transactions.some(
+      (other: any) => other.transaction_number === `REV-${txNum}`
+    );
+  };
+
   return (
     <div className="space-y-6">
+      {/* Notes Modal */}
+      {editingNotes && (
+        <NotesModal
+          notes={editingNotes.notes}
+          title={t('transactions.editNotes')}
+          onSave={handleUpdateNotes}
+          onClose={() => setEditingNotes(null)}
+        />
+      )}
+
+      {/* Void Confirmation */}
+      {voidingId && (
+        <VoidConfirmModal
+          message={t('transactions.voidConfirm')}
+          reasonLabel={t('transactions.voidReason')}
+          onConfirm={handleVoid}
+          onClose={() => setVoidingId(null)}
+        />
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg shadow">
@@ -205,10 +370,10 @@ function PurchasesTab() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {t('common.date')}
+                  {t('transactions.transactionNumber')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {t('transactions.location')}
+                  {t('common.date')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   {t('transactions.material')}
@@ -216,17 +381,17 @@ function PurchasesTab() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   {t('transactions.source')}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   {t('transactions.weightKg')}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   {t('transactions.totalCost')}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {t('transactions.totalPaid')}
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {t('common.status')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {t('common.status')}
+                  {t('common.actions')}
                 </th>
               </tr>
             </thead>
@@ -244,51 +409,94 @@ function PurchasesTab() {
                   </td>
                 </tr>
               ) : (
-                filteredTransactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      {format(new Date(tx.transaction_date || tx.created_at), 'MMM dd, yyyy')}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      {tx.location_name || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      {tx.material_category || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      {tx.source_name || '-'}
-                      <span className="block text-xs text-gray-500 capitalize">
-                        {(tx.source_type || '').replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      {parseFloat(tx.weight_kg || 0).toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                      ${parseFloat(tx.total_cost || 0).toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      ${parseFloat(tx.paid_amount || 0).toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          tx.payment_status === 'paid'
-                            ? 'bg-green-100 text-green-800'
+                filteredTransactions.map((tx) => {
+                  const txNum = tx.transaction_number || '';
+                  const isRev = txNum.startsWith('REV-');
+                  const hasReversal = isReversed(tx);
+
+                  return (
+                    <tr key={tx.transaction_id || tx.id} className={`hover:bg-gray-50 ${isRev ? 'bg-red-50' : ''}`}>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        {txNum}
+                        {isRev && (
+                          <span className="ml-2 inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-red-100 text-red-700">
+                            {t('transactions.reversed')}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {format(new Date(tx.transaction_date || tx.created_at), 'MMM dd, yyyy')}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {tx.material_category || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {tx.source_name || '-'}
+                        <span className="block text-xs text-gray-500 capitalize">
+                          {(tx.source_type || '').replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                        {parseFloat(tx.weight_kg || 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
+                        ${parseFloat(tx.total_cost || 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            tx.payment_status === 'paid'
+                              ? 'bg-green-100 text-green-800'
+                              : tx.payment_status === 'partial'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          {tx.payment_status === 'paid'
+                            ? t('transactions.paid')
                             : tx.payment_status === 'partial'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {tx.payment_status === 'paid'
-                          ? t('transactions.paid')
-                          : tx.payment_status === 'partial'
-                          ? t('transactions.partial')
-                          : t('transactions.pending')}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                            ? t('transactions.partial')
+                            : t('transactions.pending')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1">
+                          {/* Mark as Paid */}
+                          {tx.payment_status !== 'paid' && !isRev && (
+                            <button
+                              onClick={() => handleMarkAsPaid(tx)}
+                              className="text-green-600 hover:text-green-800 p-1"
+                              title={t('transactions.markAsPaid')}
+                            >
+                              <DollarSign className="w-4 h-4" />
+                            </button>
+                          )}
+                          {/* Edit Notes */}
+                          <button
+                            onClick={() => setEditingNotes({
+                              id: tx.transaction_id || tx.id,
+                              notes: tx.notes || '',
+                            })}
+                            className="text-blue-600 hover:text-blue-800 p-1"
+                            title={t('transactions.editNotes')}
+                          >
+                            <FileText className="w-4 h-4" />
+                          </button>
+                          {/* Void */}
+                          {!isRev && !hasReversal && (
+                            <button
+                              onClick={() => setVoidingId(tx.transaction_id || tx.id)}
+                              className="text-red-600 hover:text-red-800 p-1"
+                              title={t('transactions.voidTransaction')}
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -328,6 +536,11 @@ function SalesTab() {
   const [materials, setMaterials] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
+
+  // Notes editing state
+  const [editingNotes, setEditingNotes] = useState<{ id: string; notes: string } | null>(null);
+  // Void confirmation state
+  const [voidingId, setVoidingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -402,6 +615,37 @@ function SalesTab() {
     }
   };
 
+  const handleUpdateNotes = async (notes: string) => {
+    if (!editingNotes) return;
+    try {
+      await salesAPI.updateNotes(editingNotes.id, { notes });
+      toast.success(t('sales.notesUpdated'));
+      setEditingNotes(null);
+      loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || t('sales.notesUpdateError'));
+    }
+  };
+
+  const handleVoid = async (reason: string) => {
+    if (!voidingId) return;
+    try {
+      await salesAPI.voidSale(voidingId, { reason });
+      toast.success(t('sales.voided'));
+      setVoidingId(null);
+      loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || t('sales.voidError'));
+    }
+  };
+
+  const isReversed = (sale: Sale) => {
+    const saleNum = sale.sale_number || '';
+    return saleNum.startsWith('REV-') || sales.some(
+      (other) => other.sale_number === `REV-${saleNum}`
+    );
+  };
+
   const statusKeys: Record<string, string> = {
     paid: 'sales.paid',
     partial: 'sales.partial',
@@ -430,6 +674,26 @@ function SalesTab() {
 
   return (
     <div className="space-y-6">
+      {/* Notes Modal */}
+      {editingNotes && (
+        <NotesModal
+          notes={editingNotes.notes}
+          title={t('sales.editNotes')}
+          onSave={handleUpdateNotes}
+          onClose={() => setEditingNotes(null)}
+        />
+      )}
+
+      {/* Void Confirmation */}
+      {voidingId && (
+        <VoidConfirmModal
+          message={t('sales.voidConfirm')}
+          reasonLabel={t('sales.voidReason')}
+          onConfirm={handleVoid}
+          onClose={() => setVoidingId(null)}
+        />
+      )}
+
       <div className="flex items-center gap-3">
         <p className="text-sm text-gray-500">{t('sales.totalSales', { count: total })}</p>
       </div>
@@ -469,50 +733,85 @@ function SalesTab() {
                     <td colSpan={9} className="px-4 py-8 text-center text-gray-500">{t('sales.noResults')}</td>
                   </tr>
                 ) : (
-                  sales.map((sale) => (
-                    <tr key={sale.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{sale.sale_number}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {sale.sale_date ? new Date(sale.sale_date).toLocaleDateString() : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{sale.client_name || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{sale.material_category || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                        {Number(sale.weight_kg || 0).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
-                        ${Number(sale.total_amount || 0).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {getStatusBadge(sale.payment_status)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {getStatusBadge(sale.delivery_status || 'not_delivered')}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1">
-                          {sale.payment_status !== 'paid' && (
-                            <button
-                              onClick={() => handleUpdatePayment(sale.id, 'paid')}
-                              className="text-green-600 hover:text-green-800 p-1"
-                              title={t('sales.markAsPaid')}
-                            >
-                              <DollarSign className="w-4 h-4" />
-                            </button>
+                  sales.map((sale) => {
+                    const isRev = sale.sale_number?.startsWith('REV-');
+                    const hasReversal = isReversed(sale);
+
+                    return (
+                      <tr key={sale.id} className={`hover:bg-gray-50 ${isRev ? 'bg-red-50' : ''}`}>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          {sale.sale_number}
+                          {isRev && (
+                            <span className="ml-2 inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-red-100 text-red-700">
+                              {t('transactions.reversed')}
+                            </span>
                           )}
-                          {sale.delivery_status !== 'delivered' && (
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          {sale.sale_date ? new Date(sale.sale_date).toLocaleDateString() : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{sale.client_name || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{sale.material_category || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                          {Number(sale.weight_kg || 0).toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                          ${Number(sale.total_amount || 0).toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {getStatusBadge(sale.payment_status)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {getStatusBadge(sale.delivery_status || 'not_delivered')}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-1">
+                            {/* Mark as Paid */}
+                            {sale.payment_status !== 'paid' && !isRev && (
+                              <button
+                                onClick={() => handleUpdatePayment(sale.id, 'paid')}
+                                className="text-green-600 hover:text-green-800 p-1"
+                                title={t('sales.markAsPaid')}
+                              >
+                                <DollarSign className="w-4 h-4" />
+                              </button>
+                            )}
+                            {/* Mark as Delivered */}
+                            {sale.delivery_status !== 'delivered' && !isRev && (
+                              <button
+                                onClick={() => handleUpdateDelivery(sale.id, 'delivered')}
+                                className="text-blue-600 hover:text-blue-800 p-1"
+                                title={t('sales.markAsDelivered')}
+                              >
+                                <Truck className="w-4 h-4" />
+                              </button>
+                            )}
+                            {/* Edit Notes */}
                             <button
-                              onClick={() => handleUpdateDelivery(sale.id, 'delivered')}
+                              onClick={() => setEditingNotes({
+                                id: sale.id,
+                                notes: sale.notes || '',
+                              })}
                               className="text-blue-600 hover:text-blue-800 p-1"
-                              title={t('sales.markAsDelivered')}
+                              title={t('sales.editNotes')}
                             >
-                              <Truck className="w-4 h-4" />
+                              <FileText className="w-4 h-4" />
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            {/* Void */}
+                            {!isRev && !hasReversal && (
+                              <button
+                                onClick={() => setVoidingId(sale.id)}
+                                className="text-red-600 hover:text-red-800 p-1"
+                                title={t('sales.voidSale')}
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
