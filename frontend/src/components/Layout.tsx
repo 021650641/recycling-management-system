@@ -150,7 +150,7 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="p-4 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 100px)' }}>
+        <nav className="p-4 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 160px)' }}>
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.path);
@@ -227,8 +227,19 @@ export default function Layout() {
           )}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
-          <p className="text-[10px] text-gray-400 text-center">v{packageJson.version} &mdash; &copy; {new Date().getFullYear()} Panacea</p>
+        <div className="absolute bottom-0 left-0 right-0 border-t border-gray-200 bg-white">
+          <Link
+            to="/help"
+            className={`flex items-center px-4 py-3 mx-4 mt-3 rounded-lg transition-colors ${
+              location.pathname === '/help'
+                ? 'bg-primary-50 text-primary-700 font-medium'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <HelpCircle className="w-5 h-5 mr-3" />
+            {t('nav.help')}
+          </Link>
+          <p className="text-[10px] text-gray-400 text-center py-2">v{packageJson.version} &mdash; &copy; {new Date().getFullYear()} Panacea</p>
         </div>
       </aside>
 
@@ -245,16 +256,6 @@ export default function Layout() {
             </button>
 
             <div className="flex items-center gap-3">
-              {/* Help / User Guide */}
-              <Link
-                to="/help"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                title={t('nav.help')}
-              >
-                <HelpCircle className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('nav.help')}</span>
-              </Link>
-
               {/* Language toggle */}
               <button
                 onClick={toggleLanguage}
